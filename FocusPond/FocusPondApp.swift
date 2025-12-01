@@ -11,7 +11,9 @@ import SwiftUI
 struct FocusPondApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            TimerView()
         }
     }
 }
+
+
