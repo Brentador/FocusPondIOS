@@ -1,85 +1,85 @@
 import Combine
 import UIKit
+import Foundation
 
 enum TimerState {
     case idle
     case paused
     case running
-    case completed
-    case failed
 }
 
 final class TimerService : ObservableObject {
-    @Published private(set) var remainingTime: TimeInterval = 0
-    @Published private(set) var activeDuration: TimeInterval = 0
-    @Published private(set) var sessionCompleted: Bool = false
+    static let shared = TimerService()
+    @Published var remainingTime: Int64 = 30 * 60 * 1000
+    @Published var activeDuration: Int64 = 0
+    @Published var state: TimerState = .idle
+    @Published var sessionCompleted: Bool = false
     
     private var timer: Timer?
-    private var isRunning: Bool = false
-    private let tickInterval: TimeInterval = 0.1
+    private let defaultDuration: Int64 = 30 * 60 * 1000
+    
+    private init(){}
  
     
-    func startTimer(duration: TimeInterval) {
+    func startTimer(duration: Int64) {
         timer?.invalidate()
         sessionCompleted = false
-        
-        if !isRunning && remainingTime == 0 {
+            
+        if state == .idle {
             activeDuration = duration
         }
-        
+            
         remainingTime = duration
-        isRunning = true
-        
-        timer = Timer.scheduledTimer(withTimeInterval: tickInterval, repeats: true) { _ in
-            self.tick()
-        }
-        
+        state = .running
+            
+        startTicking()
     }
     
+    private func startTicking() {
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            self?.tick()
+        }
+    }
+
+    
     func pauseTimer() {
-        if (isRunning == true){
+        if (state == .running){
             timer?.invalidate()
             timer = nil
-            isRunning = false
-        } else { return }
+            state = .paused
+        }
     }
     
     
     func resumeTimer() {
-        if (isRunning == false && remainingTime > 0){
-            startTimer(duration: remainingTime)
-        } else {
-            return
+        if (state == .paused && remainingTime > 0){
+            state = .running
+            startTicking()
         }
     }
     
     func stopTimer() {
         timer?.invalidate()
         timer = nil
-        isRunning = false
         remainingTime = 0
         activeDuration = 0
         sessionCompleted = false
     }
     
     func resetSessionCompletion(){
-        
+        sessionCompleted = false
     }
     
     private func tick() {
-        remainingTime -= tickInterval
+        remainingTime -= 1000
         
         if remainingTime <= 0 {
-            remainingTime = 0
             timer?.invalidate()
             timer = nil
-            isRunning = false
+            remainingTime = 0
+            state = .idle
             sessionCompleted = true
         }
-    }
-    
-    deinit {
-        timer?.invalidate()
     }
     
 }
