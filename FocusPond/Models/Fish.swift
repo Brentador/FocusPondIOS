@@ -16,9 +16,9 @@ struct Fish: Identifiable, Codable {
     let totalTimeNeeded: Int
     let cost: Int
     
-    let eggSprite: String
-    let frySprite: String
-    let adultSprite: String
+    let eggSprite: String?
+    let frySprite: String?
+    let adultSprite: String?
     
     var growthPercentage: Float {
         guard totalTimeNeeded > 0 else { return 0 }

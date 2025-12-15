@@ -1,5 +1,12 @@
 import Foundation
 
+struct FishImage: Decodable {
+    let id: Int
+    let egg_url: String
+    let fry_url: String
+    let fish_url: String
+}
+
 class APIService {
     static let shared = APIService()
     private let baseURL = "http://localhost:8000/api"
@@ -12,6 +19,20 @@ class APIService {
             guard let data = data, error == nil else { completion(nil); return }
             do {
                 let decoded = try JSONDecoder().decode([OwnedFish].self, from: data)
+                completion(decoded)
+            } catch {
+                print(error)
+                completion(nil)
+            }
+        }.resume()
+    }
+    
+    func getFishImages(completion: @escaping ([FishImage]?) -> Void) {
+        guard let url = URL(string: "\(baseURL)/fish-images") else { completion(nil); return }
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            guard let data = data, error == nil else { completion(nil); return }
+            do {
+                let decoded = try JSONDecoder().decode([FishImage].self, from: data)
                 completion(decoded)
             } catch {
                 print(error)

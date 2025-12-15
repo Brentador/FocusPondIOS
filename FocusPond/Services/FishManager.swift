@@ -15,23 +15,26 @@ class FishManager: ObservableObject {
     @MainActor
     func loadData() {
         APIService.shared.getOwnedFish { [weak self] fishList in
-            DispatchQueue.main.async {
-                guard let self = self, let fishList = fishList else { return }
-                
-                self.ownedFish = fishList.compactMap { owned in
-                    guard let masterFish = FishData.fishList.first(where: { $0.id == owned.fish_id }) else { return nil }
-                    return Fish(
-                        id: masterFish.id,
-                        name: masterFish.name,
-                        rarity: masterFish.rarity,
-                        quantity: owned.quantity,
-                        timeStudied: owned.time_studied,
-                        totalTimeNeeded: masterFish.totalTimeNeeded,
-                        cost: masterFish.cost,
-                        eggSprite: masterFish.eggSprite,
-                        frySprite: masterFish.frySprite,
-                        adultSprite: masterFish.adultSprite
-                    )
+            guard let self = self, let fishList = fishList else { return }
+            APIService.shared.getFishImages { imageList in
+                DispatchQueue.main.async {
+                    let imageDict = Dictionary(uniqueKeysWithValues: (imageList ?? []).map { ($0.id, $0) })
+                    self.ownedFish = fishList.compactMap { owned in
+                        guard let masterFish = FishData.fishList.first(where: { $0.id == owned.fish_id }) else { return nil }
+                        let images = imageDict[owned.fish_id]
+                        return Fish(
+                            id: masterFish.id,
+                            name: masterFish.name,
+                            rarity: masterFish.rarity,
+                            quantity: owned.quantity,
+                            timeStudied: owned.time_studied,
+                            totalTimeNeeded: masterFish.totalTimeNeeded,
+                            cost: masterFish.cost,
+                            eggSprite: images?.egg_url,
+                            frySprite: images?.fry_url,
+                            adultSprite: images?.fish_url
+                        )
+                    }
                 }
             }
         }

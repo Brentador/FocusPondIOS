@@ -6,9 +6,9 @@ struct FishData {
             rarity: .common,
             totalTimeNeeded: 60,
             cost: 0,
-            eggSprite: "gold_egg",
-            frySprite: "gold_fry",
-            adultSprite: "gold_fish"
+            eggSprite: nil,
+            frySprite: nil,
+            adultSprite: nil
         ),
         Fish(
             id: 2,
@@ -16,9 +16,9 @@ struct FishData {
             rarity: .common,
             totalTimeNeeded: 120,
             cost: 100,
-            eggSprite: "carp_egg",
-            frySprite: "carp_fry",
-            adultSprite: "carp_fish"
+            eggSprite: nil,
+            frySprite: nil,
+            adultSprite: nil
         ),
         Fish(
             id: 3,
@@ -26,9 +26,9 @@ struct FishData {
             rarity: .rare,
             totalTimeNeeded: 180,
             cost: 200,
-            eggSprite: "beta_egg",
-            frySprite: "beta_fry",
-            adultSprite: "beta_fish"
+            eggSprite: nil,
+            frySprite: nil,
+            adultSprite: nil
         )
     ]
 }
