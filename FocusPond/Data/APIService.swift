@@ -8,6 +8,53 @@ struct FishImage: Decodable {
 }
 
 class APIService {
+            // Fetch timer state
+    func getTimerState(completion: @escaping (TimerStateModel?) -> Void) {
+        guard let url = URL(string: "\(baseURL)/timer-state") else { completion(nil); return }
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            guard let data = data, error == nil else { completion(nil); return }
+            do {
+                let decoded = try JSONDecoder().decode(TimerStateModel.self, from: data)
+                completion(decoded)
+            } catch {
+                print(error)
+                completion(nil)
+            }
+        }.resume()
+    }
+
+            // Update timer state
+    func updateTimerState(_ timerState: TimerStateModel, completion: @escaping (Bool) -> Void) {
+        guard let url = URL(string: "\(baseURL)/timer-state") else { completion(false); return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            do {
+            let data = try JSONEncoder().encode(timerState)
+            request.httpBody = data
+        } catch {
+            print(error)
+            completion(false)
+            return
+        }
+        URLSession.shared.dataTask(with: request) { data, _, error in
+        guard data != nil, error == nil else { completion(false); return }
+            completion(true)
+        }.resume()
+    }
+    func getPondFish(completion: @escaping ([PondFish]?) -> Void) {
+        guard let url = URL(string: "\(baseURL)/pond-fish") else { completion(nil); return }
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            guard let data = data, error == nil else { completion(nil); return }
+            do {
+                let decoded = try JSONDecoder().decode([PondFish].self, from: data)
+                completion(decoded)
+            } catch {
+                print(error)
+                completion(nil)
+            }
+        }.resume()
+    }
     static let shared = APIService()
     private let baseURL = "http://localhost:8000/api"
     

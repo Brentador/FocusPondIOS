@@ -21,7 +21,26 @@ class TimerViewModel: ObservableObject {
     
     init(){
         setupObserver()
-        
+        fetchTimerState()
+    }
+
+    private func fetchTimerState() {
+        APIService.shared.getTimerState { [weak self] timerState in
+            guard let self = self, let timerState = timerState else { return }
+            DispatchQueue.main.async {
+                if timerState.is_running {
+                    self.timerState = .running
+                } else if timerState.was_abandoned {
+                    self.showAbandonedTimerDialog = true
+                    self.timerState = .idle
+                    if let fish = FishManager.shared.selectedFish {
+                        FishManager.shared.resetFishProgress(fishId: fish.id)
+                    }
+                } else {
+                    self.timerState = .idle
+                }
+            }
+        }
     }
 
     
@@ -62,6 +81,8 @@ class TimerViewModel: ObservableObject {
         if timerState == .idle {
             timerService.startTimer(duration: Int64(selectedDuration) * 60 * 1000)
             timerState = .running
+            let timerStateModel = TimerStateModel(id: 1, is_running: true, was_abandoned: false)
+            APIService.shared.updateTimerState(timerStateModel) { _ in }
         }
     }
     
@@ -69,6 +90,8 @@ class TimerViewModel: ObservableObject {
         if(timerState == .running){
             timerService.pauseTimer()
             timerState = .paused
+            let timerStateModel = TimerStateModel(id: 1, is_running: false, was_abandoned: false)
+            APIService.shared.updateTimerState(timerStateModel) { _ in }
         }
     }
     
@@ -76,6 +99,8 @@ class TimerViewModel: ObservableObject {
         if(timerState == .paused){
             timerService.resumeTimer()
             timerState = .running
+            let timerStateModel = TimerStateModel(id: 1, is_running: true, was_abandoned: false)
+            APIService.shared.updateTimerState(timerStateModel) { _ in }
         }
     }
     
@@ -84,6 +109,8 @@ class TimerViewModel: ObservableObject {
         timerState = .idle
         remainingTimeText = formatMillis(millis: Int64(selectedDuration) * 60 * 1000)
         sessionCompleted = false
+        let timerStateModel = TimerStateModel(id: 1, is_running: false, was_abandoned: false)
+        APIService.shared.updateTimerState(timerStateModel) { _ in }
     }
     
     func setDuration(_ minutes: Int) {

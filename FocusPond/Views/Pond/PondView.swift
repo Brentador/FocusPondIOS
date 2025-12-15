@@ -1,12 +1,71 @@
 import SwiftUI
+import Kingfisher
 
 struct PondView: View {
+    @StateObject private var viewModel = PondViewModel()
+    @State private var pondSize: CGSize? = nil
+    let fishSize: CGFloat = 150
+
     var body: some View {
-        ZStack {
-            Color.blue.opacity(0.2).edgesIgnoringSafeArea(.all)
-            Text("Pond Screen")
-                .font(.largeTitle)
-                .foregroundColor(.blue)
+        GeometryReader { geometry in
+            ZStack(alignment: .topLeading) {
+                // Pond background (placeholder, will be dynamic later)
+                Color.green.opacity(0.2)
+                    .edgesIgnoringSafeArea(.all)
+
+                // Floating fish
+                ForEach(viewModel.fishPositions) { fishPos in
+                    FloatingFish(fishPosition: fishPos, fishSize: fishSize)
+                }
+            }
+            .onAppear {
+                if pondSize == nil {
+                    pondSize = geometry.size
+                    viewModel.fetchAndInitializeFish(
+                        screenWidth: geometry.size.width,
+                        screenHeight: geometry.size.height,
+                        fishSize: fishSize
+                    )
+                }
+            }
+            .onChange(of: geometry.size) { newSize in
+                if pondSize == nil {
+                    pondSize = newSize
+                    viewModel.fetchAndInitializeFish(
+                        screenWidth: newSize.width,
+                        screenHeight: newSize.height,
+                        fishSize: fishSize
+                    )
+                }
+            }
         }
+    }
+}
+
+struct FloatingFish: View {
+    let fishPosition: FishPosition
+    let fishSize: CGFloat
+
+    @State private var animX: CGFloat = 0
+    @State private var animY: CGFloat = 0
+
+    var body: some View {
+        let scaleX: CGFloat = fishPosition.facingLeft ? -1 : 1
+        KFImage(URL(string: fishPosition.fish.adultSprite ?? ""))
+            .placeholder {
+                Image(systemName: "fish")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: fishSize, height: fishSize)
+            }
+            .resizable()
+            .scaledToFit()
+            .frame(width: fishSize, height: fishSize)
+            .scaleEffect(x: scaleX, y: 1, anchor: .center)
+            .offset(x: fishPosition.targetX, y: fishPosition.targetY)
+            .animation(
+                .linear(duration: fishPosition.animationDuration),
+                value: fishPosition.targetX + fishPosition.targetY
+            )
     }
 }

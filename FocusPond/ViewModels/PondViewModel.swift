@@ -12,28 +12,38 @@ struct FishPosition: Identifiable {
 }
 
 @MainActor
+
 class PondViewModel: ObservableObject {
     @Published var fishPositions: [FishPosition] = []
-    
     private var movementTasks: [Task<Void, Never>] = []
+    private var pondFish: [Fish] = []
 
-    func initializeFish(screenWidth: CGFloat, screenHeight: CGFloat, fishSize: CGFloat) {
+    func fetchAndInitializeFish(screenWidth: CGFloat, screenHeight: CGFloat, fishSize: CGFloat) {
         movementTasks.forEach { $0.cancel() }
         movementTasks.removeAll()
         fishPositions.removeAll()
-        
-        for fish in FishManager.shared.pondFish {
-            var pos = FishPosition(
-                fish: fish,
-                targetX: CGFloat.random(in: 0...(screenWidth - fishSize)),
-                targetY: CGFloat.random(in: 0...(screenHeight - fishSize)),
-                animationDuration: TimeInterval.random(in: 3...5)
-            )
-            fishPositions.append(pos)
-            
-            let index = fishPositions.count - 1
-            let task = startMovement(index: index, screenWidth: screenWidth, screenHeight: screenHeight, fishSize: fishSize)
-            movementTasks.append(task)
+
+        APIService.shared.getPondFish { [weak self] pondFishList in
+            guard let self = self, let pondFishList = pondFishList else { return }
+            // Map PondFish to Fish using FishData.fishList
+            let fishArray: [Fish] = pondFishList.compactMap { pondFish in
+                FishData.fishList.first(where: { $0.id == pondFish.fish_id })
+            }
+            DispatchQueue.main.async {
+                self.pondFish = fishArray
+                for fish in fishArray {
+                    var pos = FishPosition(
+                        fish: fish,
+                        targetX: CGFloat.random(in: 0...(screenWidth - fishSize)),
+                        targetY: CGFloat.random(in: 0...(screenHeight - fishSize)),
+                        animationDuration: TimeInterval.random(in: 3...5)
+                    )
+                    self.fishPositions.append(pos)
+                    let index = self.fishPositions.count - 1
+                    let task = self.startMovement(index: index, screenWidth: screenWidth, screenHeight: screenHeight, fishSize: fishSize)
+                    self.movementTasks.append(task)
+                }
+            }
         }
     }
 

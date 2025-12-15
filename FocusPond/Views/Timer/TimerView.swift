@@ -8,7 +8,7 @@ struct TimerView: View {
     
     var body: some View {
         let selectedFish = fishManager.selectedFish
-        
+
         VStack(spacing: 16) {
             Text(selectedFish?.name ?? "Select Fish")
                 .font(.title)
@@ -112,6 +112,9 @@ struct TimerView: View {
                             dismissButton: .default(Text("OK")) { }
                         )
                     }
+                }
+                .onAppear {
+                    fishManager.loadData()
                 }
     
     private func alertMessage() -> String {
