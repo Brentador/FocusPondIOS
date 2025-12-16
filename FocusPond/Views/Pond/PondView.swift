@@ -1,17 +1,21 @@
 import SwiftUI
 import Kingfisher
+import FocusPond.Services
 
 struct PondView: View {
     @StateObject private var viewModel = PondViewModel()
+    @StateObject private var weatherService = WeatherService()
     @State private var pondSize: CGSize? = nil
     let fishSize: CGFloat = 150
 
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .topLeading) {
-                // Pond background (placeholder, will be dynamic later)
-                Color.green.opacity(0.2)
+                Image(backgroundImageName(for: weatherService.currentWeather))
+                    .resizable()
+                    .scaledToFill()
                     .edgesIgnoringSafeArea(.all)
+                    .clipped()
 
                 // Floating fish
                 ForEach(viewModel.fishPositions) { fishPos in
@@ -19,6 +23,7 @@ struct PondView: View {
                 }
             }
             .onAppear {
+                weatherService.start()
                 if pondSize == nil {
                     pondSize = geometry.size
                     viewModel.fetchAndInitializeFish(
@@ -40,12 +45,21 @@ struct PondView: View {
             }
         }
     }
+    private func backgroundImageName(for condition: WeatherCondition) -> String {
+        switch condition {
+            case .sunny, .unknown:
+                return "sun_pond"
+            case .rainy:
+                return "rain_pond"
+            case .snowy:
+                return "snow_pond"
+        }
+    }
 }
 
 struct FloatingFish: View {
     let fishPosition: FishPosition
     let fishSize: CGFloat
-
     @State private var animX: CGFloat = 0
     @State private var animY: CGFloat = 0
 
