@@ -11,7 +11,6 @@ class FishManager: ObservableObject {
     
     private init() {}
     
-
     @MainActor
     func loadData() {
         APIService.shared.getOwnedFish { [weak self] fishList in
