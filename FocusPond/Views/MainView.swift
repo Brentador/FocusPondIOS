@@ -14,7 +14,6 @@ struct MainView: View {
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                 NavigationStack {
                     item.view
-                        .navigationTitle(item.title)
                 }
                 .tabItem {
                     Text(item.title)

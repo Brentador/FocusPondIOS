@@ -1,6 +1,5 @@
 import SwiftUI
 import Kingfisher
-import FocusPond.Services
 
 struct PondView: View {
     @StateObject private var viewModel = PondViewModel()
@@ -17,24 +16,41 @@ struct PondView: View {
                     .edgesIgnoringSafeArea(.all)
                     .clipped()
 
-                // Floating fish
                 ForEach(viewModel.fishPositions) { fishPos in
                     FloatingFish(fishPosition: fishPos, fishSize: fishSize)
                 }
+                // test the background changes based on weather (change the lat and long with locations with the correct weather condition
+                /*.overlay(
+                    HStack {
+                        Button("Sunny") {
+                            weatherService.fetchWeather(lat: 30.0444, lon: 31.2357) // Cairo
+                        }
+                        Button("Rainy") {
+                            weatherService.fetchWeather(lat: 51.5074, lon: -0.1278) // London
+                        }
+                        Button("Snowy") {
+                            weatherService.fetchWeather(lat: 56.2526, lon: -120.8460) // Helsinki
+                        }
+                    }
+                    .padding()
+                    .background(Color.black.opacity(0.3))
+                    .cornerRadius(8)
+                    .padding(.bottom, 20),
+                    alignment: .bottom
+                )*/
             }
             .onAppear {
                 weatherService.start()
-                if pondSize == nil {
-                    pondSize = geometry.size
-                    viewModel.fetchAndInitializeFish(
-                        screenWidth: geometry.size.width,
-                        screenHeight: geometry.size.height,
-                        fishSize: fishSize
-                    )
-                }
+                pondSize = geometry.size
+                viewModel.fetchAndInitializeFish(
+                    screenWidth: geometry.size.width,
+                    screenHeight: geometry.size.height,
+                    fishSize: fishSize
+                )
             }
             .onChange(of: geometry.size) { newSize in
-                if pondSize == nil {
+                guard newSize.width > 0 && newSize.height > 0 else { return }
+                if pondSize != newSize {
                     pondSize = newSize
                     viewModel.fetchAndInitializeFish(
                         screenWidth: newSize.width,
@@ -43,6 +59,7 @@ struct PondView: View {
                     )
                 }
             }
+            
         }
     }
     private func backgroundImageName(for condition: WeatherCondition) -> String {

@@ -5,10 +5,11 @@ struct TimerView: View {
     @StateObject var timerViewModel = TimerViewModel()
     @ObservedObject var fishManager = FishManager.shared
     @State private var dropdownExpanded = false
+    @State private var showInventory = false
     
     var body: some View {
         let selectedFish = fishManager.selectedFish
-
+        
         VStack(spacing: 16) {
             Text(selectedFish?.name ?? "Select Fish")
                 .font(.title)
@@ -49,8 +50,8 @@ struct TimerView: View {
                                 get: { Double(timerViewModel.selectedDuration) },
                                 set: { timerViewModel.setDuration(Int($0)) }
                             ),
-                            in: 5...120,
-                            step: 5
+                            in: 1...180,
+                            step: 1
                         )
                         .disabled(timerViewModel.timerState != .idle)
                         .padding(.horizontal, 32)
@@ -83,18 +84,30 @@ struct TimerView: View {
                         .padding(.horizontal, 16)
             
             if timerViewModel.timerState == .idle {
-                Menu {
-                    ForEach(fishManager.ownedFish, id: \.id) { fish in
-                        Button(fish.name) {
-                            fishManager.selectFish(fish: fish)
-                        }
-                    }
-                } label: {
-                    Text(selectedFish?.name ?? "Inventory")
-                        .padding()
-                        .background(Color.gray.opacity(0.2))
-                        .cornerRadius(8)
-                }
+                Button("Inventory (\(fishManager.ownedFish.count))") {
+                                    showInventory = true
+                                }
+                                .padding()
+                                .background(Color.gray.opacity(0.2))
+                                .cornerRadius(8)
+                                .sheet(isPresented: $showInventory) {
+                                    VStack {
+                                        Text("Select a Fish")
+                                            .font(.headline)
+                                            .padding()
+                                        List(fishManager.ownedFish, id: \.id) { fish in
+                                            Button(fish.name) {
+                                                fishManager.selectFish(fish: fish)
+                                                showInventory = false  // Close sheet after selection
+                                            }
+                                            .padding()
+                                        }
+                                        Button("Close") {
+                                            showInventory = false
+                                        }
+                                        .padding()
+                                    }
+                                }
                         }
                     }
                     .padding()
@@ -112,10 +125,15 @@ struct TimerView: View {
                             dismissButton: .default(Text("OK")) { }
                         )
                     }
+                    .onAppear {
+                        fishManager.loadData()
+                        if timerViewModel.shouldFetchState() {
+                            timerViewModel.fetchTimerState()
+                            timerViewModel.markStateFetched()
+                        }
+                    }
                 }
-                .onAppear {
-                    fishManager.loadData()
-                }
+
     
     private func alertMessage() -> String {
             guard let fish = fishManager.selectedFish else { return "" }
@@ -166,4 +184,3 @@ extension Fish {
         return nil
     }
 }
-

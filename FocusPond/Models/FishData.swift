@@ -4,7 +4,7 @@ struct FishData {
             id: 1,
             name: "Gold Fish",
             rarity: .common,
-            totalTimeNeeded: 60,
+            totalTimeNeeded: 1,
             cost: 0,
             eggSprite: nil,
             frySprite: nil,

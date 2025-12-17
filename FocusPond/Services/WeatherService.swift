@@ -27,33 +27,41 @@ final class WeatherService: NSObject, ObservableObject, CLLocationManagerDelegat
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
+        print("Location received: \(location.coordinate.latitude), \(location.coordinate.longitude)")
         manager.stopUpdatingLocation()
         fetchWeather(lat: location.coordinate.latitude, lon: location.coordinate.longitude)
     }
-
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         print("Location error: \(error.localizedDescription)")
         currentWeather = .unknown
     }
 
-    private func fetchWeather(lat: Double, lon: Double) {
+    func fetchWeather(lat: Double, lon: Double) {
         let urlString =
-            "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)&current=weathercode"
+            "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)&current_weather=true"
         guard let url = URL(string: urlString) else { return }
+        
+        print("Fetching weather for: \(lat), \(lon)")
+
 
         URLSession.shared.dataTask(with: url) { data, _, _ in
             guard let data = data else { return }
 
             do {
                 let decoded = try JSONDecoder().decode(OpenMeteoResponse.self, from: data)
-                let condition = self.weatherCondition(from: decoded.current.weathercode)
-                self.currentWeather = condition
+                print("Weather decoded: code \(decoded.current_weather.weathercode)")
+                let condition = self.weatherCondition(from: decoded.current_weather.weathercode)
+                DispatchQueue.main.async {
+                    print("Updating currentWeather to: \(condition)")
+                    self.currentWeather = condition
+                }
             } catch {
                 print("Weather decode error:", error)
                 self.currentWeather = .unknown
             }
         }.resume()
     }
+
 
     private func weatherCondition(from code: Int) -> WeatherCondition {
         if code >= 71 && code <= 77 {
@@ -67,7 +75,7 @@ final class WeatherService: NSObject, ObservableObject, CLLocationManagerDelegat
 }
 
 struct OpenMeteoResponse: Codable {
-    let current: CurrentWeather
+    let current_weather: CurrentWeather
 }
 
 struct CurrentWeather: Codable {

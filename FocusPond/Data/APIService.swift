@@ -130,6 +130,20 @@ class APIService {
         }.resume()
     }
     
+    func getCurrency(completion: @escaping (Int?) -> Void) {
+        guard let url = URL(string: "\(baseURL)/currency") else { completion(nil); return }
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            guard let data = data, error == nil else { completion(nil); return }
+            do {
+                let decoded = try JSONDecoder().decode([String: Int].self, from: data)
+                completion(decoded["amount"])
+            } catch {
+                print(error)
+                completion(nil)
+            }
+        }.resume()
+    }
+    
     func updateCurrency(amount: Int, completion: @escaping (Bool) -> Void) {
         guard let url = URL(string: "\(baseURL)/currency") else { completion(false); return }
         var request = URLRequest(url: url)

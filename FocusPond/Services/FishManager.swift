@@ -15,13 +15,22 @@ class FishManager: ObservableObject {
     @MainActor
     func loadData() {
         APIService.shared.getOwnedFish { [weak self] fishList in
-            guard let self = self, let fishList = fishList else { return }
+            guard let self = self, let fishList = fishList else {
+                print("Debug: getOwnedFish failed or returned nil")
+                return
+            }
+            print("Debug: getOwnedFish returned \(fishList.count) fish")
             APIService.shared.getFishImages { imageList in
                 DispatchQueue.main.async {
                     let imageDict = Dictionary(uniqueKeysWithValues: (imageList ?? []).map { ($0.id, $0) })
+                    print("Debug: getFishImages returned \(imageList?.count ?? 0) images")
                     self.ownedFish = fishList.compactMap { owned in
-                        guard let masterFish = FishData.fishList.first(where: { $0.id == owned.fish_id }) else { return nil }
+                        guard let masterFish = FishData.fishList.first(where: { $0.id == owned.fish_id }) else {
+                            print("Debug: No master fish found for id \(owned.fish_id)")
+                            return nil
+                        }
                         let images = imageDict[owned.fish_id]
+                        print("Debug: Creating fish \(owned.fish_id) with images: \(images != nil)")
                         return Fish(
                             id: masterFish.id,
                             name: masterFish.name,
@@ -34,6 +43,19 @@ class FishManager: ObservableObject {
                             frySprite: images?.fry_url,
                             adultSprite: images?.fish_url
                         )
+                    }
+                    print("Debug: ownedFish now has \(self.ownedFish.count) fish")
+                    if let selected = self.selectedFish, let updatedFish = self.ownedFish.first(where: { $0.id == selected.id }) {
+                                        self.selectedFish = updatedFish
+                    }
+                    
+                    // Load currency
+                    APIService.shared.getCurrency { amount in
+                        if let amount = amount {
+                            DispatchQueue.main.async {
+                                self.currency = amount
+                            }
+                        }
                     }
                 }
             }
