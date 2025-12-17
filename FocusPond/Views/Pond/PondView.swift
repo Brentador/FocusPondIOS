@@ -16,6 +16,7 @@ struct PondView: View {
                     .edgesIgnoringSafeArea(.all)
                     .clipped()
 
+                
                 ForEach(viewModel.fishPositions) { fishPos in
                     FloatingFish(fishPosition: fishPos, fishSize: fishSize)
                 }
