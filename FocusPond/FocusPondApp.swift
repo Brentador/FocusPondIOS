@@ -9,6 +9,10 @@ import SwiftUI
 
 @main
 struct FocusPondApp: App {
+    init() {
+        _ = CacheService.shared
+    }
+    
     var body: some Scene {
         WindowGroup {
             MainView()
