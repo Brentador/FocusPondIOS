@@ -26,6 +26,13 @@ class CacheService: ObservableObject {
         startMonitoring()
         startBackendPolling()
     }
+
+    private func userKey(for key: String) -> String {
+        if let userId = AuthService.shared.currentUser?.id {
+            return "\(key)_user\(userId)"
+        }
+        return key
+    }
     
     // Start monitoring network status
     private func startMonitoring() {
@@ -210,28 +217,33 @@ class CacheService: ObservableObject {
     
     // Load cached operations from UserDefaults
     private func loadCachedOperations() {
-        if let data = UserDefaults.standard.data(forKey: pendingOperationsKey),
-           let operations = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-            pendingOperations = operations
-            print("Loaded \(operations.count) cached operations")
-            if operations.count > 0 {
-                wasBackendOffline = true
-            }
+        let key = userKey(for: pendingOperationsKey)
+    if let data = UserDefaults.standard.data(forKey: key),
+       let operations = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+        pendingOperations = operations
+        print("Loaded \(operations.count) cached operations for user")
+        if operations.count > 0 {
+            wasBackendOffline = true
         }
+    } else {
+        pendingOperations = []
+    }
     }
     
     // Save cached operations to UserDefaults
     private func saveCachedOperations() {
+        let key = userKey(for: pendingOperationsKey)
         if let data = try? JSONSerialization.data(withJSONObject: pendingOperations) {
-            UserDefaults.standard.set(data, forKey: pendingOperationsKey)
+            UserDefaults.standard.set(data, forKey: key)
         }
     }
     
     // testing/debugging
     func clearCache() {
+        let key = userKey(for: pendingOperationsKey)
+        UserDefaults.standard.removeObject(forKey: key)
         pendingOperations.removeAll()
-        saveCachedOperations()
-        print("Cache cleared")
+        print("Cache cleared for user")
     }
     
     deinit {

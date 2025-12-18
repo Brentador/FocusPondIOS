@@ -15,8 +15,20 @@ struct FocusPondApp: App {
     
     var body: some Scene {
         WindowGroup {
-            MainView()
+            if AuthService.shared.currentUser != nil {
+                MainView()
+                .toolbar {
+                    Button("Logout") {
+                        AuthService.shared.logout()
+                    }
+                }
+            } else {
+                NavigationView {
+                    LoginView()
+                }
+            }
         }
+        
     }
 }
 

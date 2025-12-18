@@ -9,16 +9,22 @@ struct FishImage: Decodable, Encodable {
 
 class APIService {
     static let shared = APIService()
-    private let baseURL = "http://localhost:8000/api"
+    private let baseURL = "http://localhost:8000"
+    private var currentUserId: Int? {
+        return AuthService.shared.currentUser?.id
+    }
     
     init() {}
     
     // MARK: - Currency
     func getCurrency(completion: @escaping (Currency?) -> Void) {
-        guard let url = URL(string: "\(baseURL)/currency") else {
-            completion(LocalDataCache.shared.getCachedCurrency())
+        guard let userId = currentUserId else {
+            print("User not logged in, using cached data")
+            completion(LocalDataCache.shared.getCachedCurrency()) 
             return
         }
+        let urlString = "\(baseURL)/api/\(userId)/currency"
+        guard let url = URL(string: urlString) else { completion(nil); return }
         
         URLSession.shared.dataTask(with: url) { data, _, error in
             Task { @MainActor in
@@ -57,7 +63,18 @@ class APIService {
     }
     
     func performUpdateCurrency(amount: Int, completion: @escaping (Bool) -> Void) {
-        guard let url = URL(string: "\(baseURL)/currency") else { completion(false); return }
+        guard let userId = currentUserId else {
+            print("User not logged in, using cached data")
+                LocalDataCache.shared.updateCurrencyInCache(newAmount: amount)
+            Task { @MainActor in
+                CacheService.shared.cacheOperation(["type": "updateCurrency", "amount": amount])
+            }
+            completion(true)
+            return
+        }
+        let urlString = "\(baseURL)/api/\(userId)/currency"
+        guard let url = URL(string: urlString) else { completion(false); return }
+
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -77,7 +94,13 @@ class APIService {
     
     // MARK: - Timer State
     func getTimerState(completion: @escaping (TimerStateModel?) -> Void) {
-        guard let url = URL(string: "\(baseURL)/timer-state") else { completion(nil); return }
+        guard let userId = currentUserId else {
+            print("User not logged in, no timer state")
+            completion(nil)
+            return
+        }
+        let urlString = "\(baseURL)/api/\(userId)/timer-state"
+        guard let url = URL(string: urlString) else { completion(nil); return }
         URLSession.shared.dataTask(with: url) { data, _, error in
             Task { @MainActor in
                 guard let data = data, error == nil else {
@@ -97,7 +120,14 @@ class APIService {
     }
 
     func updateTimerState(_ timerState: TimerStateModel, completion: @escaping (Bool) -> Void) {
-        guard let url = URL(string: "\(baseURL)/timer-state") else { completion(false); return }
+        guard let userId = currentUserId else {
+            print("User not logged in, cannot update timer state")
+            completion(false)
+            return
+        }
+
+        let urlString = "\(baseURL)/api/\(userId)/timer-state"
+        guard let url = URL(string: urlString) else { completion(false); return }
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -120,10 +150,13 @@ class APIService {
     
     // MARK: - Owned Fish
     func getOwnedFish(completion: @escaping ([OwnedFish]?) -> Void) {
-        guard let url = URL(string: "\(baseURL)/owned-fish") else {
+        guard let userId = currentUserId else {
+            print("User not logged in, using cached data")
             completion(LocalDataCache.shared.getCachedOwnedFish())
             return
         }
+        let urlString = "\(baseURL)/api/\(userId)/owned-fish"
+        guard let url = URL(string: urlString) else { completion(nil); return }
         
         URLSession.shared.dataTask(with: url) { data, _, error in
             Task { @MainActor in
@@ -147,7 +180,6 @@ class APIService {
     func addOwnedFish(fishId: Int, completion: @escaping (Bool) -> Void) {
         performAddOwnedFish(fishId: fishId) { success in
             if !success {
-                // Failed - update cache optimistically and queue operation
                 LocalDataCache.shared.addOwnedFishToCache(fishId: fishId)
                 Task { @MainActor in
                     CacheService.shared.cacheOperation(["type": "addOwnedFish", "fishId": fishId])
@@ -160,7 +192,18 @@ class APIService {
     }
     
     func performAddOwnedFish(fishId: Int, completion: @escaping (Bool) -> Void) {
-        guard let url = URL(string: "\(baseURL)/owned-fish") else { completion(false); return }
+        guard let userId = currentUserId else {
+            print("User not logged in, using cached data")
+            LocalDataCache.shared.addOwnedFishToCache(fishId: fishId)
+            Task { @MainActor in
+                CacheService.shared.cacheOperation(["type": "addOwnedFish", "fishId": fishId])
+            }
+            completion(true)
+            return
+        }
+        let urlString = "\(baseURL)/api/\(userId)/owned-fish"
+        guard let url = URL(string: urlString) else { completion(false); return }
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -181,7 +224,6 @@ class APIService {
     func addStudyTime(fishId: Int, minutes: Int, completion: @escaping (Bool) -> Void) {
         performAddStudyTime(fishId: fishId, minutes: minutes) { success in
             if !success {
-                // Failed - update cache optimistically and queue operation
                 LocalDataCache.shared.updateStudyTimeInCache(fishId: fishId, additionalMinutes: minutes)
                 Task { @MainActor in
                     CacheService.shared.cacheOperation([
@@ -198,7 +240,17 @@ class APIService {
     }
     
     func performAddStudyTime(fishId: Int, minutes: Int, completion: @escaping (Bool) -> Void) {
-        guard let url = URL(string: "\(baseURL)/owned-fish/\(fishId)/study-time") else { completion(false); return }
+        guard let userId = currentUserId else {
+            print("User not logged in, using cached data")
+            LocalDataCache.shared.updateStudyTimeInCache(fishId: fishId, additionalMinutes: minutes)
+            Task { @MainActor in
+                CacheService.shared.cacheOperation(["type": "addStudyTime", "fishId": fishId, "minutes": minutes])
+            }
+            completion(true)
+            return
+        }
+        let urlString = "\(baseURL)/api/\(userId)/owned-fish/\(fishId)/study-time"
+        guard let url = URL(string: urlString) else { completion(false); return }
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -235,7 +287,17 @@ class APIService {
     }
     
     func performResetFishProgress(fishId: Int, completion: @escaping (Bool) -> Void) {
-        guard let url = URL(string: "\(baseURL)/owned-fish/\(fishId)") else { completion(false); return }
+        guard let userId = currentUserId else {
+            print("User not logged in, using cached data")
+            LocalDataCache.shared.removeFishFromCache(fishId: fishId)
+            Task { @MainActor in
+                CacheService.shared.cacheOperation(["type": "resetFishProgress", "fishId": fishId])
+            }
+            completion(true)
+            return
+        }
+        let urlString = "\(baseURL)/api/\(userId)/owned-fish/\(fishId)"
+        guard let url = URL(string: urlString) else { completion(false); return }
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         request.timeoutInterval = 10
@@ -252,10 +314,14 @@ class APIService {
     
     // MARK: - Pond Fish
     func getPondFish(completion: @escaping ([PondFish]?) -> Void) {
-        guard let url = URL(string: "\(baseURL)/pond-fish") else {
+        guard let userId = currentUserId else {
+            print("User not logged in, using cached data")
             completion(LocalDataCache.shared.getCachedPondFish())
             return
         }
+        let urlString = "\(baseURL)/api/\(userId)/pond-fish"
+        guard let url = URL(string: urlString) else { completion(nil); return }
+    
         
         URLSession.shared.dataTask(with: url) { data, _, error in
             Task { @MainActor in
@@ -295,7 +361,18 @@ class APIService {
     }
     
     func performAddFishToPond(fishId: Int, completion: @escaping (Bool) -> Void) {
-        guard let url = URL(string: "\(baseURL)/pond-fish") else { completion(false); return }
+        guard let userId = currentUserId else {
+            print("User not logged in, using cached data")
+            LocalDataCache.shared.addFishToPondCache(fishId: fishId)
+            Task { @MainActor in
+                CacheService.shared.cacheOperation(["type": "addFishToPond", "fishId": fishId])
+            }
+            completion(true)
+            return
+        }
+        let urlString = "\(baseURL)/api/\(userId)/pond-fish"
+        guard let url = URL(string: urlString) else { completion(false); return }
+    
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -315,7 +392,7 @@ class APIService {
     
     // MARK: - Fish Images
     func getFishImages(completion: @escaping ([FishImage]?) -> Void) {
-        guard let url = URL(string: "\(baseURL)/fish-images") else {
+        guard let url = URL(string: "\(baseURL)/api/fish-images") else {
             completion(LocalDataCache.shared.getCachedFishImages())
             return
         }
@@ -338,4 +415,55 @@ class APIService {
             }
         }.resume()
     }
+
+    // MARK: - Auth
+struct LoginResponse: Codable {
+    let user_id: Int
+}
+
+func register(username: String, password: String, email: String, completion: @escaping (Bool) -> Void) {
+    let urlString = "\(baseURL)/api/register"
+    guard let url = URL(string: urlString) else { completion(false); return }
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    let body = ["username": username, "password": password, "email": email]
+    request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+    
+    URLSession.shared.dataTask(with: request) { data, _, error in
+        guard data != nil, error == nil else {
+            print("Register failed: \(error?.localizedDescription ?? "unknown")")
+            completion(false)
+            return
+        }
+        completion(true)
+    }.resume()
+}
+
+func login(username: String, password: String, completion: @escaping (LoginResponse?) -> Void) {
+    let urlString = "\(baseURL)/api/login"
+    guard let url = URL(string: urlString) else { completion(nil); return }
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    let body = ["username": username, "password": password]
+    request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+    
+    URLSession.shared.dataTask(with: request) { data, _, error in
+        Task { @MainActor in
+            guard let data = data, error == nil else {
+                print("Login failed: \(error?.localizedDescription ?? "unknown")")
+                completion(nil)
+                return
+            }
+            do {
+                let decoded = try JSONDecoder().decode(LoginResponse.self, from: data)
+                completion(decoded)
+            } catch {
+                print("Login decode error:", error)
+                completion(nil)
+            }
+        }
+    }.resume()
+}
 }

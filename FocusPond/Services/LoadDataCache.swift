@@ -14,19 +14,26 @@ class LocalDataCache {
     private let fishImagesTimestampKey = "cached_fish_images_timestamp"
     
     private init() {}
+
+    private func userKey(for key: String) -> String {
+        if let userId = AuthService.shared.currentUser?.id {
+            return "\(key)_user\(userId)"
+        }
+        return key
+    }
     
     // MARK: - Owned Fish
     func cacheOwnedFish(_ fish: [OwnedFish]) {
         if let data = try? JSONEncoder().encode(fish) {
-            UserDefaults.standard.set(data, forKey: ownedFishKey)
-            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: ownedFishTimestampKey)
+            UserDefaults.standard.set(data, forKey: userKey(for: ownedFishKey))
+            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: userKey(for: ownedFishTimestampKey))
             print("Cached \(fish.count) owned fish")
         }
     }
     
     func getCachedOwnedFish() -> [OwnedFish]? {
-        guard let data = UserDefaults.standard.data(forKey: ownedFishKey),
-              let fish = try? JSONDecoder().decode([OwnedFish].self, from: data) else {
+        guard let data = UserDefaults.standard.data(forKey: userKey(for: ownedFishKey)),
+            let fish = try? JSONDecoder().decode([OwnedFish].self, from: data) else {
             return nil
         }
         print("Retrieved \(fish.count) cached owned fish")
@@ -34,9 +41,9 @@ class LocalDataCache {
     }
     
     func getOwnedFishLastUpdated() -> Date? {
-          let timestamp = UserDefaults.standard.double(forKey: ownedFishTimestampKey)
-          return timestamp > 0 ? Date(timeIntervalSince1970: timestamp) : nil
-      }
+        let timestamp = UserDefaults.standard.double(forKey: userKey(for: ownedFishTimestampKey))
+        return timestamp > 0 ? Date(timeIntervalSince1970: timestamp) : nil
+    }
     
     // Add a new owned fish to cache
     func addOwnedFishToCache(fishId: Int) {
@@ -76,15 +83,15 @@ class LocalDataCache {
     // MARK: - Pond Fish
     func cachePondFish(_ fish: [PondFish]) {
         if let data = try? JSONEncoder().encode(fish) {
-            UserDefaults.standard.set(data, forKey: pondFishKey)
-            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: pondFishTimestampKey)
+            UserDefaults.standard.set(data, forKey: userKey(for: pondFishKey))
+            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: userKey(for: pondFishTimestampKey))
             print("Cached \(fish.count) pond fish")
         }
     }
     
     func getCachedPondFish() -> [PondFish]? {
-        guard let data = UserDefaults.standard.data(forKey: pondFishKey),
-              let fish = try? JSONDecoder().decode([PondFish].self, from: data) else {
+        guard let data = UserDefaults.standard.data(forKey: userKey(for: pondFishKey)),
+            let fish = try? JSONDecoder().decode([PondFish].self, from: data) else {
             return nil
         }
         print("Retrieved \(fish.count) cached pond fish")
@@ -92,7 +99,7 @@ class LocalDataCache {
     }
     
     func getPondFishLastUpdated() -> Date? {
-        let timestamp = UserDefaults.standard.double(forKey: pondFishTimestampKey)
+        let timestamp = UserDefaults.standard.double(forKey: userKey(for: pondFishTimestampKey))
         return timestamp > 0 ? Date(timeIntervalSince1970: timestamp) : nil
     }
     
@@ -112,15 +119,15 @@ class LocalDataCache {
     // MARK: - Currency
     func cacheCurrency(_ currency: Currency) {
         if let data = try? JSONEncoder().encode(currency) {
-            UserDefaults.standard.set(data, forKey: currencyKey)
-            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: currencyTimestampKey)
+            UserDefaults.standard.set(data, forKey: userKey(for: currencyKey))
+            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: userKey(for: currencyTimestampKey))
             print("Cached currency: \(currency.amount)")
         }
     }
     
     func getCachedCurrency() -> Currency? {
-        guard let data = UserDefaults.standard.data(forKey: currencyKey),
-              let currency = try? JSONDecoder().decode(Currency.self, from: data) else {
+        guard let data = UserDefaults.standard.data(forKey: userKey(for: currencyKey)),
+            let currency = try? JSONDecoder().decode(Currency.self, from: data) else {
             return nil
         }
         print("Retrieved cached currency: \(currency.amount)")
@@ -128,7 +135,7 @@ class LocalDataCache {
     }
     
     func getCurrencyLastUpdated() -> Date? {
-        let timestamp = UserDefaults.standard.double(forKey: currencyTimestampKey)
+        let timestamp = UserDefaults.standard.double(forKey: userKey(for: currencyTimestampKey))
         return timestamp > 0 ? Date(timeIntervalSince1970: timestamp) : nil
     }
     
@@ -147,27 +154,29 @@ class LocalDataCache {
             print("Cached \(images.count) fish images")
         }
     }
-    
+
     func getCachedFishImages() -> [FishImage]? {
         guard let data = UserDefaults.standard.data(forKey: fishImagesKey),
-              let images = try? JSONDecoder().decode([FishImage].self, from: data) else {
+            let images = try? JSONDecoder().decode([FishImage].self, from: data) else {
             return nil
         }
         print("Retrieved \(images.count) cached fish images")
         return images
     }
-    
+
     func getFishImagesLastUpdated() -> Date? {
         let timestamp = UserDefaults.standard.double(forKey: fishImagesTimestampKey)
         return timestamp > 0 ? Date(timeIntervalSince1970: timestamp) : nil
     }
     
     // MARK: - Clear Cache
-    func clearAllCache() {
-        UserDefaults.standard.removeObject(forKey: ownedFishKey)
-        UserDefaults.standard.removeObject(forKey: pondFishKey)
-        UserDefaults.standard.removeObject(forKey: currencyKey)
-        UserDefaults.standard.removeObject(forKey: fishImagesKey)
-        print("All data cache cleared")
+    func clearUserCache() {
+        UserDefaults.standard.removeObject(forKey: userKey(for: ownedFishKey))
+        UserDefaults.standard.removeObject(forKey: userKey(for: pondFishKey))
+        UserDefaults.standard.removeObject(forKey: userKey(for: currencyKey))
+        UserDefaults.standard.removeObject(forKey: userKey(for: ownedFishTimestampKey))
+        UserDefaults.standard.removeObject(forKey: userKey(for: pondFishTimestampKey))
+        UserDefaults.standard.removeObject(forKey: userKey(for: currencyTimestampKey))
+        print("User-specific cache cleared")
     }
 }
