@@ -2,7 +2,9 @@ import SwiftUI
 
 struct ShopView: View {
     @ObservedObject var fishManager = FishManager.shared
+    @ObservedObject var cacheService = CacheService.shared
     @State private var purchaseMessage: String? = nil
+    @State private var isReloading = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -17,6 +19,51 @@ struct ShopView: View {
                     .foregroundColor(.blue)
             }
             .padding(.horizontal)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                            Text("Last Updated:")
+                                .font(.subheadline)
+                                .bold()
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text("Owned Fish: \(LocalDataCache.shared.getOwnedFishLastUpdated()?.formatted(date: .abbreviated, time: .shortened) ?? "Never")")
+                                    Text("Currency: \(LocalDataCache.shared.getCurrencyLastUpdated()?.formatted(date: .abbreviated, time: .shortened) ?? "Never")")
+                                    Text("Pond Fish: \(LocalDataCache.shared.getPondFishLastUpdated()?.formatted(date: .abbreviated, time: .shortened) ?? "Never")")
+                                    Text("Fish Images: \(LocalDataCache.shared.getFishImagesLastUpdated()?.formatted(date: .abbreviated, time: .shortened) ?? "Never")")
+                                }
+                                Spacer()
+                                Button(action: {
+                                    Task {
+                                        let reachable = await cacheService.isBackendReachable()
+                                        if cacheService.isOnline && reachable {
+                                            isReloading = true
+                                            CacheService.shared.manualFetchAndReload {
+                                                isReloading = false
+                                            }
+                                        } else {
+                                            purchaseMessage = "Server unreachable: Cannot refresh cache"
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                                purchaseMessage = nil
+                                            }
+                                        }
+                                    }
+                                }) {
+                                    if isReloading {
+                                        ProgressView()
+                                    } else {
+                                        Text("Reload Cache")
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .background(cacheService.isOnline ? Color.blue : Color.gray)
+                                            .foregroundColor(.white)
+                                            .cornerRadius(8)
+                                    }
+                                }
+                                .disabled(isReloading)
+                            }
+                        }
+                        .padding(.horizontal)
+                        .font(.caption)
 
             // Purchase message
             if let message = purchaseMessage {
@@ -31,7 +78,6 @@ struct ShopView: View {
             ScrollView {
                 VStack(spacing: 12) {
                     ForEach(FishData.fishList) { fish in
-                        // Move these out of the view builder
                         let isOwned = fishManager.ownedFish.contains(where: { $0.id == fish.id })
                         let canAfford = fishManager.currency >= fish.cost
                         let buttonDisabled = isOwned || !canAfford

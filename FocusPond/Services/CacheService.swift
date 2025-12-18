@@ -15,44 +15,76 @@ class CacheService: ObservableObject {
     // Cache for pending operations
     private let pendingOperationsKey = "pendingOperations"
     private var pendingOperations: [[String: Any]] = []
-    
-    // Track if we're currently syncing to avoid duplicate syncs
     private var isSyncing = false
+    
+    // Polling timer to check backend
+    private var backendCheckTimer: Timer?
+    private var wasBackendOffline = false
     
     private init() {
         loadCachedOperations()
         startMonitoring()
+        startBackendPolling()
     }
     
     // Start monitoring network status
     private func startMonitoring() {
         monitor.pathUpdateHandler = { [weak self] path in
-            Task { @MainActor in
-                let wasOffline = self?.isOnline == false
-                self?.isOnline = path.status == .satisfied
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                let newStatus = path.status == .satisfied
+                self.isOnline = newStatus
                 
-                // Only sync when transitioning from offline to online
-                if wasOffline && self?.isOnline == true {
-                    print("Back online - syncing cached operations")
-                    await self?.syncCachedOperations()
+                if newStatus {
+                    print("Network connected")
+                    // Sync pending operations when network comes back
+                    if !self.pendingOperations.isEmpty {
+                        Task {
+                            await self.syncCachedOperations()
+                        }
+                    }
+                } else {
+                    print("Network disconnected")
+                    self.wasBackendOffline = true
                 }
             }
         }
         monitor.start(queue: queue)
     }
     
+    // Poll backend every 5 seconds
+    private func startBackendPolling() {
+        backendCheckTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                await self?.checkBackendStatus()
+            }
+        }
+    }
+    
     // Check if backend is reachable
+    private func checkBackendStatus() async {
+        let reachable = await isBackendReachable()
+        
+        if reachable && wasBackendOffline {
+            // Backend came back online!
+            print("Backend is back online!")
+            wasBackendOffline = false
+            await syncCachedOperations()
+        } else if !reachable {
+            wasBackendOffline = true
+        }
+    }
+    
     func isBackendReachable() async -> Bool {
-        guard let url = URL(string: "http://localhost:8000/api/health") else { return false }
+        guard let url = URL(string: "http://localhost:8000/api/owned-fish") else { return false }
         
         do {
             let (_, response) = try await URLSession.shared.data(from: url)
             if let httpResponse = response as? HTTPURLResponse {
-                return httpResponse.statusCode == 200
+                return httpResponse.statusCode == 200 || httpResponse.statusCode == 404
             }
             return false
         } catch {
-            print("Backend not reachable: \(error.localizedDescription)")
             return false
         }
     }
@@ -61,7 +93,7 @@ class CacheService: ObservableObject {
     func cacheOperation(_ operation: [String: Any]) {
         pendingOperations.append(operation)
         saveCachedOperations()
-        print("Cached operation: \(operation["type"] ?? "unknown")")
+        print("Cached operation: \(operation["type"] ?? "unknown") - Total pending: \(pendingOperations.count)")
     }
     
     // Get count of pending operations
@@ -71,7 +103,10 @@ class CacheService: ObservableObject {
     
     // Sync cached operations when online
     func syncCachedOperations() async {
-        guard isOnline && !isSyncing else { return }
+        guard !isSyncing else {
+            print("Sync already in progress")
+            return
+        }
         guard !pendingOperations.isEmpty else {
             print("No pending operations to sync")
             return
@@ -91,7 +126,6 @@ class CacheService: ObservableObject {
             }
         }
         
-        // Remove successfully synced operations (in reverse order to maintain indices)
         for index in successfulOperations.reversed() {
             pendingOperations.remove(at: index)
         }
@@ -99,10 +133,18 @@ class CacheService: ObservableObject {
         saveCachedOperations()
         isSyncing = false
         
-        print("✅ Sync complete. \(successfulOperations.count) operations synced, \(pendingOperations.count) remaining")
+        print("Sync complete. \(successfulOperations.count) operations synced, \(pendingOperations.count) remaining")
+        
+        // After sync reload data from server
+        if successfulOperations.count > 0 {
+            print("Reloading data from server...")
+            // Give server a moment to process
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            FishManager.shared.loadData()
+        }
     }
     
-    // Process a cached operation with async/await
+    // Process a cached operation
     private func processCachedOperation(_ operation: [String: Any]) async -> Bool {
         guard let type = operation["type"] as? String else { return false }
         
@@ -114,7 +156,7 @@ class CacheService: ObservableObject {
                     return
                 }
                 APIService.shared.performAddOwnedFish(fishId: fishId) { success in
-                    print(success ? "Synced addOwnedFish for fishId: \(fishId)" : "❌ Failed to sync addOwnedFish")
+                    print(success ? "Synced addOwnedFish for fishId: \(fishId)" : "Failed to sync addOwnedFish")
                     continuation.resume(returning: success)
                 }
                 
@@ -124,7 +166,7 @@ class CacheService: ObservableObject {
                     return
                 }
                 APIService.shared.performUpdateCurrency(amount: amount) { success in
-                    print(success ? "Synced updateCurrency for amount: \(amount)" : "❌ Failed to sync updateCurrency")
+                    print(success ? "Synced updateCurrency for amount: \(amount)" : "Failed to sync updateCurrency")
                     continuation.resume(returning: success)
                 }
                 
@@ -134,9 +176,8 @@ class CacheService: ObservableObject {
                     continuation.resume(returning: false)
                     return
                 }
-                // FIX: Call performAddStudyTime instead of addStudyTime
                 APIService.shared.performAddStudyTime(fishId: fishId, minutes: minutes) { success in
-                    print(success ? "Synced addStudyTime for fishId: \(fishId)" : "❌ Failed to sync addStudyTime")
+                    print(success ? "Synced addStudyTime for fishId: \(fishId)" : "Failed to sync addStudyTime")
                     continuation.resume(returning: success)
                 }
                 
@@ -145,9 +186,8 @@ class CacheService: ObservableObject {
                     continuation.resume(returning: false)
                     return
                 }
-                // FIX: Call performAddFishToPond instead of addFishToPond
                 APIService.shared.performAddFishToPond(fishId: fishId) { success in
-                    print(success ? "Synced addFishToPond for fishId: \(fishId)" : "❌ Failed to sync addFishToPond")
+                    print(success ? "Synced addFishToPond for fishId: \(fishId)" : "Failed to sync addFishToPond")
                     continuation.resume(returning: success)
                 }
                 
@@ -156,9 +196,8 @@ class CacheService: ObservableObject {
                     continuation.resume(returning: false)
                     return
                 }
-                // FIX: Call performResetFishProgress instead of resetFishProgress
                 APIService.shared.performResetFishProgress(fishId: fishId) { success in
-                    print(success ? "Synced resetFishProgress for fishId: \(fishId)" : "❌ Failed to sync resetFishProgress")
+                    print(success ? "Synced resetFishProgress for fishId: \(fishId)" : "Failed to sync resetFishProgress")
                     continuation.resume(returning: success)
                 }
                 
@@ -175,6 +214,9 @@ class CacheService: ObservableObject {
            let operations = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
             pendingOperations = operations
             print("Loaded \(operations.count) cached operations")
+            if operations.count > 0 {
+                wasBackendOffline = true
+            }
         }
     }
     
@@ -185,10 +227,59 @@ class CacheService: ObservableObject {
         }
     }
     
-    // Clear all cached operations (for testing/debugging)
+    // testing/debugging
     func clearCache() {
         pendingOperations.removeAll()
         saveCachedOperations()
         print("Cache cleared")
+    }
+    
+    deinit {
+        backendCheckTimer?.invalidate()
+    }
+    
+    @MainActor
+    func manualFetchAndReload(completion: @escaping () -> Void) {
+        let apiService = APIService()
+        
+        let group = DispatchGroup()
+        
+        group.enter()
+        apiService.getOwnedFish { fish in
+            if let fish = fish {
+                LocalDataCache.shared.cacheOwnedFish(fish)
+            }
+            group.leave()
+        }
+        
+        group.enter()
+        apiService.getPondFish { fish in
+            if let fish = fish {
+                LocalDataCache.shared.cachePondFish(fish)
+            }
+            group.leave()
+        }
+        
+        group.enter()
+        apiService.getCurrency { currency in
+            if let currency = currency {
+                LocalDataCache.shared.cacheCurrency(currency)
+            }
+            group.leave()
+        }
+        
+        group.enter()
+        apiService.getFishImages { images in
+            if let images = images {
+                LocalDataCache.shared.cacheFishImages(images)
+            }
+            group.leave()
+        }
+        
+        group.notify(queue: .main) {
+            print("Manual cache update complete")
+            FishManager.shared.loadData()  // Reload UI from cache
+            completion()
+        }
     }
 }

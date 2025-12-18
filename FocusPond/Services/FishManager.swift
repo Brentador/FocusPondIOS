@@ -13,29 +13,52 @@ class FishManager: ObservableObject {
     
     @MainActor
     func loadData() {
-        APIService.shared.getOwnedFish { [weak self] fishList in
-            guard let self = self, let fishList = fishList else {
-                print("Debug: getOwnedFish failed or returned nil")
-                return
-            }
-            print("Debug: getOwnedFish returned \(fishList.count) fish")
-            APIService.shared.getFishImages { imageList in
-                DispatchQueue.main.async {
-                    let imageDict = Dictionary(uniqueKeysWithValues: (imageList ?? []).map { ($0.id, $0) })
-                    print("Debug: getFishImages returned \(imageList?.count ?? 0) images")
-                    self.ownedFish = fishList.compactMap { owned in
-                        guard let masterFish = FishData.fishList.first(where: { $0.id == owned.fish_id }) else {
-                            print("Debug: No master fish found for id \(owned.fish_id)")
-                            return nil
-                        }
-                        let images = imageDict[owned.fish_id]
-                        print("Debug: Creating fish \(owned.fish_id) with images: \(images != nil)")
+        if let cachedOwnedFish = LocalDataCache.shared.getCachedOwnedFish(),
+               let cachedImages = LocalDataCache.shared.getCachedFishImages() {
+                let imageDict = Dictionary(uniqueKeysWithValues: cachedImages.map { ($0.id, $0) })
+                print("Debug: Loading from cache - \(cachedOwnedFish.count) owned fish, \(cachedImages.count) images")
+                self.ownedFish = cachedOwnedFish.compactMap { owned in
+                    guard let masterFish = FishData.fishList.first(where: { $0.id == owned.fish_id }) else {
+                        print("Debug: No master fish found for id \(owned.fish_id)")
+                        return nil
+                    }
+                    let images = imageDict[owned.fish_id]
+                    print("Debug: Creating fish \(owned.fish_id) with images: \(images != nil)")
+                    return Fish(
+                        id: masterFish.id,
+                        name: masterFish.name,
+                        rarity: masterFish.rarity,
+                        quantity: owned.quantity,
+                        timeStudied: owned.time_studied,
+                        totalTimeNeeded: masterFish.totalTimeNeeded,
+                        cost: masterFish.cost,
+                        eggSprite: images?.egg_url,
+                        frySprite: images?.fry_url,
+                        adultSprite: images?.fish_url
+                    )
+                }
+                print("Debug: ownedFish now has \(self.ownedFish.count) fish")
+                if let selected = self.selectedFish, let updatedFish = self.ownedFish.first(where: { $0.id == selected.id }) {
+                    self.selectedFish = updatedFish
+                }
+                
+                // Load currency from cache
+                if let cachedCurrency = LocalDataCache.shared.getCachedCurrency() {
+                    self.currency = cachedCurrency.amount
+                }
+                
+                if let cachedPondFish = LocalDataCache.shared.getCachedPondFish() {
+                    self.pondFish = cachedPondFish.filter { pond in
+                        FishData.fishList.contains { $0.id == pond.fish_id }
+                    }.map { pond in
+                        let masterFish = FishData.fishList.first { $0.id == pond.fish_id }!
+                        let images = imageDict[pond.fish_id]
                         return Fish(
                             id: masterFish.id,
                             name: masterFish.name,
                             rarity: masterFish.rarity,
-                            quantity: owned.quantity,
-                            timeStudied: owned.time_studied,
+                            quantity: 1,
+                            timeStudied: 0,
                             totalTimeNeeded: masterFish.totalTimeNeeded,
                             cost: masterFish.cost,
                             eggSprite: images?.egg_url,
@@ -43,38 +66,26 @@ class FishManager: ObservableObject {
                             adultSprite: images?.fish_url
                         )
                     }
-                    print("Debug: ownedFish now has \(self.ownedFish.count) fish")
-                    if let selected = self.selectedFish, let updatedFish = self.ownedFish.first(where: { $0.id == selected.id }) {
-                                        self.selectedFish = updatedFish
-                    }
-                    
-                    // Load currency
-                    APIService.shared.getCurrency { amount in
-                        if let amount = amount {
-                            DispatchQueue.main.async {
-                                self.currency = amount
-                            }
-                        }
-                    }
                 }
+            } else {
+                print("Debug: No cached data available")
             }
-        }
     }
     
 
     func addFishToInventory(fishId: Int) {
-        APIService.shared.addOwnedFish(fishId: fishId) { [weak self] success in
+        APIService.shared.addOwnedFish(fishId: fishId) {  success in
             if success {
-                self?.loadData()
+                CacheService.shared.manualFetchAndReload {}
             }
         }
     }
     
 
     func addStudyTime(fishId: Int, minutes: Int) {
-        APIService.shared.addStudyTime(fishId: fishId, minutes: minutes) { [weak self] success in
+        APIService.shared.addStudyTime(fishId: fishId, minutes: minutes) { success in
             if success {
-                self?.loadData()
+                CacheService.shared.manualFetchAndReload {}
             }
         }
     }
@@ -90,9 +101,9 @@ class FishManager: ObservableObject {
     
 
     func addFishToPond(fish: Fish) {
-        APIService.shared.addFishToPond(fishId: fish.id) { [weak self] success in
+        APIService.shared.addFishToPond(fishId: fish.id) { success in
             if success {
-                self?.loadData() // Reload pond fish
+                CacheService.shared.manualFetchAndReload {}
             }
         }
     }
@@ -100,11 +111,9 @@ class FishManager: ObservableObject {
 
     func addCurrency(amount: Int) {
         let newAmount = currency + amount
-        APIService.shared.updateCurrency(amount: newAmount) { [weak self] success in
+        APIService.shared.updateCurrency(amount: newAmount) { success in
             if success {
-                DispatchQueue.main.async {
-                    self?.currency = newAmount
-                }
+                CacheService.shared.manualFetchAndReload {}
             }
         }
     }
@@ -117,9 +126,9 @@ class FishManager: ObservableObject {
     
 
     func resetFishProgress(fishId: Int) {
-        APIService.shared.resetFishProgress(fishId: fishId) { [weak self] success in
+        APIService.shared.resetFishProgress(fishId: fishId) { success in
             if success {
-                self?.loadData()
+                CacheService.shared.manualFetchAndReload {}
             }
         }
     }

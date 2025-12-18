@@ -4,6 +4,7 @@ import Kingfisher
 struct PondView: View {
     @StateObject private var viewModel = PondViewModel()
     @StateObject private var weatherService = WeatherService()
+    @ObservedObject var fishManager = FishManager.shared
     @State private var pondSize: CGSize? = nil
     let fishSize: CGFloat = 150
 
@@ -42,20 +43,23 @@ struct PondView: View {
             }
             .onAppear {
                 weatherService.start()
+                fishManager.loadData()
                 pondSize = geometry.size
-                viewModel.fetchAndInitializeFish(
+                viewModel.initializeFishPositions(
                     screenWidth: geometry.size.width,
                     screenHeight: geometry.size.height,
+                    fish: fishManager.pondFish,
                     fishSize: fishSize
                 )
             }
-            .onChange(of: geometry.size) { newSize in
+            .onChange(of: geometry.size) { oldSize, newSize in
                 guard newSize.width > 0 && newSize.height > 0 else { return }
                 if pondSize != newSize {
                     pondSize = newSize
-                    viewModel.fetchAndInitializeFish(
+                    viewModel.initializeFishPositions(
                         screenWidth: newSize.width,
                         screenHeight: newSize.height,
+                        fish: fishManager.pondFish,
                         fishSize: fishSize
                     )
                 }

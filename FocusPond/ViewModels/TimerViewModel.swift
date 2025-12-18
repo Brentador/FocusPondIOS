@@ -18,7 +18,6 @@ class TimerViewModel: ObservableObject {
     
     private let timerService = TimerService.shared
     private var subscriptions = Set<AnyCancellable>()
-    private var backgroundObserver: NSObjectProtocol?
     private var hasFetchedState = false
     
     func shouldFetchState() -> Bool {
@@ -31,28 +30,6 @@ class TimerViewModel: ObservableObject {
     
     init(){
         setupObserver()
-        setupBackgroundObserver()
-    }
-    
-    deinit {
-        if let observer = backgroundObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
-    }
-    
-    private func setupBackgroundObserver() {
-        backgroundObserver = NotificationCenter.default.addObserver(
-            forName: UIApplication.didEnterBackgroundNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.handleAppGoingToBackground()
-        }
-    }
-    
-    private func handleAppGoingToBackground() {
-        // Removed abandonment logic to prevent triggering on screen switches
-        // Only check for abandonment on app launch in fetchTimerState
     }
 
     func fetchTimerState() {

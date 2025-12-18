@@ -45,19 +45,19 @@ final class WeatherService: NSObject, ObservableObject, CLLocationManagerDelegat
 
 
         URLSession.shared.dataTask(with: url) { data, _, _ in
-            guard let data = data else { return }
+            Task { @MainActor in
+                guard let data = data else { return }
 
-            do {
-                let decoded = try JSONDecoder().decode(OpenMeteoResponse.self, from: data)
-                print("Weather decoded: code \(decoded.current_weather.weathercode)")
-                let condition = self.weatherCondition(from: decoded.current_weather.weathercode)
-                DispatchQueue.main.async {
+                do {
+                    let decoded = try JSONDecoder().decode(OpenMeteoResponse.self, from: data)
+                    print("Weather decoded: code \(decoded.current_weather.weathercode)")
+                    let condition = self.weatherCondition(from: decoded.current_weather.weathercode)
                     print("Updating currentWeather to: \(condition)")
                     self.currentWeather = condition
+                } catch {
+                    print("Weather decode error:", error)
+                    self.currentWeather = .unknown
                 }
-            } catch {
-                print("Weather decode error:", error)
-                self.currentWeather = .unknown
             }
         }.resume()
     }

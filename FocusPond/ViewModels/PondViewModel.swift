@@ -17,52 +17,22 @@ class PondViewModel: ObservableObject {
     private var movementTasks: [Task<Void, Never>] = []
     private var pondFish: [Fish] = []
 
-    func fetchAndInitializeFish(screenWidth: CGFloat, screenHeight: CGFloat, fishSize: CGFloat) {
+    func initializeFishPositions(screenWidth: CGFloat, screenHeight: CGFloat, fish: [Fish], fishSize: CGFloat) {
         movementTasks.forEach { $0.cancel() }
         movementTasks.removeAll()
         fishPositions.removeAll()
 
-        APIService.shared.getPondFish { [weak self] pondFishList in
-            guard let self = self, let pondFishList = pondFishList else { return }
-            
-            // Fetch images alongside pond fish
-            APIService.shared.getFishImages { imageList in
-                let imageDict = Dictionary(uniqueKeysWithValues: (imageList ?? []).map { ($0.id, $0) })
-                
-                // Map PondFish to Fish using FishData.fishList and images
-                let fishArray: [Fish] = pondFishList.compactMap { pondFish in
-                    guard let masterFish = FishData.fishList.first(where: { $0.id == pondFish.fish_id }) else { return nil }
-                    let images = imageDict[pondFish.fish_id]
-                    return Fish(
-                        id: masterFish.id,
-                        name: masterFish.name,
-                        rarity: masterFish.rarity,
-                        quantity: 1,
-                        timeStudied: masterFish.totalTimeNeeded,
-                        totalTimeNeeded: masterFish.totalTimeNeeded,
-                        cost: masterFish.cost,
-                        eggSprite: images?.egg_url,
-                        frySprite: images?.fry_url,
-                        adultSprite: images?.fish_url
-                    )
-                }
-                
-                DispatchQueue.main.async {
-                    self.pondFish = fishArray
-                    for fish in fishArray {
-                        let pos = FishPosition(
-                            fish: fish,
-                            targetX: CGFloat.random(in: 0...max(0, screenWidth - fishSize)),
-                            targetY: CGFloat.random(in: 0...max(0, screenHeight - fishSize)),
-                            animationDuration: TimeInterval.random(in: 3...5)
-                        )
-                        self.fishPositions.append(pos)
-                        let index = self.fishPositions.count - 1
-                        let task = self.startMovement(index: index, screenWidth: screenWidth, screenHeight: screenHeight, fishSize: fishSize)
-                        self.movementTasks.append(task)
-                    }
-                }
-            }
+        for fish in fish {
+            let pos = FishPosition(
+                fish: fish,
+                targetX: CGFloat.random(in: 0...max(0, screenWidth - fishSize)),
+                targetY: CGFloat.random(in: 0...max(0, screenHeight - fishSize)),
+                animationDuration: TimeInterval.random(in: 3...5)
+            )
+            self.fishPositions.append(pos)
+            let index = self.fishPositions.count - 1
+            let task = self.startMovement(index: index, screenWidth: screenWidth, screenHeight: screenHeight, fishSize: fishSize)
+            self.movementTasks.append(task)
         }
     }
 
