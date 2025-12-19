@@ -418,6 +418,8 @@ class APIService {
 
     // MARK: - Auth
 struct LoginResponse: Codable {
+    let status: String
+    let message: String
     let user_id: Int
 }
 
@@ -449,8 +451,12 @@ func login(username: String, password: String, completion: @escaping (LoginRespo
     let body = ["username": username, "password": password]
     request.httpBody = try? JSONSerialization.data(withJSONObject: body)
     
-    URLSession.shared.dataTask(with: request) { data, _, error in
+    URLSession.shared.dataTask(with: request) { data, response, error in
         Task { @MainActor in
+        print("Login response status: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+        if let data = data, let jsonString = String(data: data, encoding: .utf8) {
+            print("Login response data: \(jsonString)")
+        }
             guard let data = data, error == nil else {
                 print("Login failed: \(error?.localizedDescription ?? "unknown")")
                 completion(nil)

@@ -1,29 +1,75 @@
 import Foundation
+import Combine
 
-class AuthService {
+class AuthService: ObservableObject {
     static let shared = AuthService()
     
     private let userDefaults = UserDefaults.standard
     private let userIdKey = "currentUserId"
     private let usernameKey = "currentUsername"
-    
-    var currentUser: User? {
-        guard let id = userDefaults.value(forKey: userIdKey) as? Int,
-              let username = userDefaults.value(forKey: usernameKey) as? String else {
-            return nil
+
+    @Published var currentUser: User? = nil {
+        didSet {
+            if let user = currentUser {
+                print("[AuthService] Current user changed to: ID=\(user.id), Username=\(user.username)")
+            } else {
+                print("[AuthService] Current user cleared (logged out)")
+            }
         }
-        return User(id: id, username: username)
+    }
+
+    private init() {
+        print("[AuthService] Initializing...")
+        if let id = userDefaults.value(forKey: userIdKey) as? Int,
+           let username = userDefaults.value(forKey: usernameKey) as? String {
+            currentUser = User(id: id, username: username)
+            print("   Restored user from UserDefaults: ID=\(id), Username=\(username)")
+        } else {
+            print("   No saved user found")
+        }
     }
     
+    
     func login(userId: Int, username: String) {
+        print("[AuthService] LOGIN INITIATED")
+        print("   New User ID: \(userId)")
+        print("   New Username: \(username)")
+        
+        // Check if switching users
+        if let oldUser = currentUser {
+            print("   Switching from user \(oldUser.id) (\(oldUser.username)) to user \(userId) (\(username))")
+        }
+        
+        currentUser = User(id: userId, username: username)
         userDefaults.set(userId, forKey: userIdKey)
         userDefaults.set(username, forKey: usernameKey)
+        
+        print("   User data saved to UserDefaults")
+        print("   Current user is now: \(currentUser?.id ?? -1)")
     }
     
     func logout() {
+        print("[AuthService] LOGOUT INITIATED")
+        
+        if let user = currentUser {
+            print("   Logging out user: ID=\(user.id), Username=\(user.username)")
+        } else {
+            print("   No user to log out")
+        }
+        
+        currentUser = nil
         userDefaults.removeObject(forKey: userIdKey)
         userDefaults.removeObject(forKey: usernameKey)
+        
+        print("   Clearing CacheService...")
         CacheService.shared.clearCache()
+        
+        print("   Clearing LocalDataCache...")
         LocalDataCache.shared.clearUserCache()
+        
+        print("   Stopping TimerService...")
+        TimerService.shared.stopTimer()
+        
+        print("   Logout complete")
     }
 }

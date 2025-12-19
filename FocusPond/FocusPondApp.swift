@@ -9,26 +9,27 @@ import SwiftUI
 
 @main
 struct FocusPondApp: App {
+    @StateObject private var authService = AuthService.shared
+    
     init() {
         _ = CacheService.shared
     }
     
     var body: some Scene {
         WindowGroup {
-            if AuthService.shared.currentUser != nil {
+            if authService.currentUser != nil {
                 MainView()
-                .toolbar {
-                    Button("Logout") {
-                        AuthService.shared.logout()
+                    .toolbar {
+                        Button("Logout") {
+                            AuthService.shared.logout()
+                        }
                     }
-                }
             } else {
                 NavigationView {
                     LoginView()
                 }
             }
         }
-        
     }
 }
 

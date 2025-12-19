@@ -17,26 +17,42 @@ class LocalDataCache {
 
     private func userKey(for key: String) -> String {
         if let userId = AuthService.shared.currentUser?.id {
-            return "\(key)_user\(userId)"
+            let userSpecificKey = "\(key)_user\(userId)"
+            print("[LocalDataCache] Generated key: '\(userSpecificKey)' for user \(userId)")
+            return userSpecificKey
         }
+        print("No user logged in, using generic key: '\(key)'")
         return key
     }
     
     // MARK: - Owned Fish
     func cacheOwnedFish(_ fish: [OwnedFish]) {
+        let currentUserId = AuthService.shared.currentUser?.id
+        print("[LocalDataCache] CACHING OWNED FISH for user \(currentUserId ?? -1): \(fish.count) fish")
+        print("   Fish IDs: \(fish.map { $0.fish_id })")
+        
         if let data = try? JSONEncoder().encode(fish) {
-            UserDefaults.standard.set(data, forKey: userKey(for: ownedFishKey))
+            let key = userKey(for: ownedFishKey)
+            UserDefaults.standard.set(data, forKey: key)
             UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: userKey(for: ownedFishTimestampKey))
-            print("Cached \(fish.count) owned fish")
+            print("   Successfully cached to key: '\(key)'")
+        } else {
+            print("   Failed to encode fish data")
         }
     }
     
     func getCachedOwnedFish() -> [OwnedFish]? {
-        guard let data = UserDefaults.standard.data(forKey: userKey(for: ownedFishKey)),
+        let currentUserId = AuthService.shared.currentUser?.id
+        let key = userKey(for: ownedFishKey)
+        
+        print("[LocalDataCache] READING OWNED FISH for user \(currentUserId ?? -1) from key: '\(key)'")
+        
+        guard let data = UserDefaults.standard.data(forKey: key),
             let fish = try? JSONDecoder().decode([OwnedFish].self, from: data) else {
+            print("   No cached data found or decode failed")
             return nil
         }
-        print("Retrieved \(fish.count) cached owned fish")
+        print("   Retrieved \(fish.count) fish with IDs: \(fish.map { $0.fish_id })")
         return fish
     }
     
@@ -47,54 +63,88 @@ class LocalDataCache {
     
     // Add a new owned fish to cache
     func addOwnedFishToCache(fishId: Int) {
+        let currentUserId = AuthService.shared.currentUser?.id
+        print("[LocalDataCache] ADDING FISH \(fishId) to cache for user \(currentUserId ?? -1)")
+        
         var cached = getCachedOwnedFish() ?? []
         
         // Check if already exists
         if let index = cached.firstIndex(where: { $0.fish_id == fishId }) {
             cached[index].quantity += 1
+            print("   Fish already exists, incrementing quantity to \(cached[index].quantity)")
         } else {
             let newFish = OwnedFish(fish_id: fishId, quantity: 1, time_studied: 0, total_time_needed: 60)
             cached.append(newFish)
+            print("   Added new fish entry")
         }
         
         cacheOwnedFish(cached)
-        print("Optimistically added fish \(fishId) to cache")
     }
     
     // Update study time in cache
     func updateStudyTimeInCache(fishId: Int, additionalMinutes: Int) {
-        guard var cached = getCachedOwnedFish() else { return }
+        let currentUserId = AuthService.shared.currentUser?.id
+        print("[LocalDataCache] UPDATING STUDY TIME for fish \(fishId), user \(currentUserId ?? -1)")
+        
+        guard var cached = getCachedOwnedFish() else {
+            print("   No cached fish found")
+            return
+        }
         
         if let index = cached.firstIndex(where: { $0.fish_id == fishId }) {
+            let oldTime = cached[index].time_studied
             cached[index].time_studied += additionalMinutes
+            print("   Updated time from \(oldTime) to \(cached[index].time_studied)")
             cacheOwnedFish(cached)
-            print("Optimistically updated study time for fish \(fishId)")
+        } else {
+            print("   Fish \(fishId) not found in cache")
         }
     }
     
     // Remove fish from cache
     func removeFishFromCache(fishId: Int) {
-        guard var cached = getCachedOwnedFish() else { return }
+        let currentUserId = AuthService.shared.currentUser?.id
+        print("[LocalDataCache] REMOVING FISH \(fishId) from cache for user \(currentUserId ?? -1)")
+        
+        guard var cached = getCachedOwnedFish() else {
+            print("   ❌ No cached fish found")
+            return
+        }
+        
+        let beforeCount = cached.count
         cached.removeAll { $0.fish_id == fishId }
+        print("   Removed \(beforeCount - cached.count) fish")
         cacheOwnedFish(cached)
-        print("Optimistically removed fish \(fishId) from cache")
     }
     
     // MARK: - Pond Fish
     func cachePondFish(_ fish: [PondFish]) {
+        let currentUserId = AuthService.shared.currentUser?.id
+        print("[LocalDataCache] CACHING POND FISH for user \(currentUserId ?? -1): \(fish.count) fish")
+        print("   Fish IDs: \(fish.map { $0.fish_id })")
+        
         if let data = try? JSONEncoder().encode(fish) {
-            UserDefaults.standard.set(data, forKey: userKey(for: pondFishKey))
+            let key = userKey(for: pondFishKey)
+            UserDefaults.standard.set(data, forKey: key)
             UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: userKey(for: pondFishTimestampKey))
-            print("Cached \(fish.count) pond fish")
+            print("   Successfully cached to key: '\(key)'")
+        } else {
+            print("   Failed to encode pond fish data")
         }
     }
     
     func getCachedPondFish() -> [PondFish]? {
-        guard let data = UserDefaults.standard.data(forKey: userKey(for: pondFishKey)),
+        let currentUserId = AuthService.shared.currentUser?.id
+        let key = userKey(for: pondFishKey)
+        
+        print("[LocalDataCache] READING POND FISH for user \(currentUserId ?? -1) from key: '\(key)'")
+        
+        guard let data = UserDefaults.standard.data(forKey: key),
             let fish = try? JSONDecoder().decode([PondFish].self, from: data) else {
+            print("   No cached data found or decode failed")
             return nil
         }
-        print("Retrieved \(fish.count) cached pond fish")
+        print("   Retrieved \(fish.count) pond fish with IDs: \(fish.map { $0.fish_id })")
         return fish
     }
     
@@ -105,6 +155,9 @@ class LocalDataCache {
     
     // Add fish to pond cache
     func addFishToPondCache(fishId: Int) {
+        let currentUserId = AuthService.shared.currentUser?.id
+        print("[LocalDataCache] ADDING FISH \(fishId) TO POND for user \(currentUserId ?? -1)")
+        
         var cached = getCachedPondFish() ?? []
         
         // Generate new ID
@@ -112,25 +165,37 @@ class LocalDataCache {
         let newPondFish = PondFish(id: newId, fish_id: fishId)
         cached.append(newPondFish)
         
+        print("   Added with pond ID: \(newId)")
         cachePondFish(cached)
-        print("Optimistically added fish \(fishId) to pond cache")
     }
     
     // MARK: - Currency
     func cacheCurrency(_ currency: Currency) {
+        let currentUserId = AuthService.shared.currentUser?.id
+        print("💾 [LocalDataCache] CACHING CURRENCY for user \(currentUserId ?? -1): \(currency.amount)")
+        
         if let data = try? JSONEncoder().encode(currency) {
-            UserDefaults.standard.set(data, forKey: userKey(for: currencyKey))
+            let key = userKey(for: currencyKey)
+            UserDefaults.standard.set(data, forKey: key)
             UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: userKey(for: currencyTimestampKey))
-            print("Cached currency: \(currency.amount)")
+            print("   Successfully cached to key: '\(key)'")
+        } else {
+            print("   Failed to encode currency data")
         }
     }
     
     func getCachedCurrency() -> Currency? {
-        guard let data = UserDefaults.standard.data(forKey: userKey(for: currencyKey)),
+        let currentUserId = AuthService.shared.currentUser?.id
+        let key = userKey(for: currencyKey)
+        
+        print("[LocalDataCache] READING CURRENCY for user \(currentUserId ?? -1) from key: '\(key)'")
+        
+        guard let data = UserDefaults.standard.data(forKey: key),
             let currency = try? JSONDecoder().decode(Currency.self, from: data) else {
+            print("   No cached currency found or decode failed")
             return nil
         }
-        print("Retrieved cached currency: \(currency.amount)")
+        print("   Retrieved currency: \(currency.amount)")
         return currency
     }
     
@@ -141,26 +206,34 @@ class LocalDataCache {
     
     // Update currency in cache
     func updateCurrencyInCache(newAmount: Int) {
+        let currentUserId = AuthService.shared.currentUser?.id
+        print("[LocalDataCache] UPDATING CURRENCY for user \(currentUserId ?? -1) to \(newAmount)")
+        
         let currency = Currency(id: 1, amount: newAmount)
         cacheCurrency(currency)
-        print("Updated currency to \(newAmount)")
     }
     
     // MARK: - Fish Images
     func cacheFishImages(_ images: [FishImage]) {
+        print("[LocalDataCache] CACHING FISH IMAGES (global): \(images.count) images")
+        print("   Image IDs: \(images.map { $0.id })")
+        
         if let data = try? JSONEncoder().encode(images) {
             UserDefaults.standard.set(data, forKey: fishImagesKey)
             UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: fishImagesTimestampKey)
-            print("Cached \(images.count) fish images")
+            print("   Successfully cached")
         }
     }
 
     func getCachedFishImages() -> [FishImage]? {
+        print("[LocalDataCache] READING FISH IMAGES (global)")
+        
         guard let data = UserDefaults.standard.data(forKey: fishImagesKey),
             let images = try? JSONDecoder().decode([FishImage].self, from: data) else {
+            print("   No cached images found")
             return nil
         }
-        print("Retrieved \(images.count) cached fish images")
+        print("   Retrieved \(images.count) images")
         return images
     }
 
@@ -171,12 +244,21 @@ class LocalDataCache {
     
     // MARK: - Clear Cache
     func clearUserCache() {
-        UserDefaults.standard.removeObject(forKey: userKey(for: ownedFishKey))
-        UserDefaults.standard.removeObject(forKey: userKey(for: pondFishKey))
-        UserDefaults.standard.removeObject(forKey: userKey(for: currencyKey))
-        UserDefaults.standard.removeObject(forKey: userKey(for: ownedFishTimestampKey))
-        UserDefaults.standard.removeObject(forKey: userKey(for: pondFishTimestampKey))
-        UserDefaults.standard.removeObject(forKey: userKey(for: currencyTimestampKey))
-        print("User-specific cache cleared")
+        let currentUserId = AuthService.shared.currentUser?.id
+        print("[LocalDataCache] CLEARING CACHE for user \(currentUserId ?? -1)")
+        
+        let keys = [
+            userKey(for: ownedFishKey),
+            userKey(for: pondFishKey),
+            userKey(for: currencyKey),
+            userKey(for: ownedFishTimestampKey),
+            userKey(for: pondFishTimestampKey),
+            userKey(for: currencyTimestampKey)
+        ]
+        
+        print("   Removing keys: \(keys)")
+        
+        keys.forEach { UserDefaults.standard.removeObject(forKey: $0) }
+        print("   User-specific cache cleared")
     }
 }

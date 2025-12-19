@@ -83,12 +83,12 @@ class CacheService: ObservableObject {
     }
     
     func isBackendReachable() async -> Bool {
-        guard let url = URL(string: "http://localhost:8000/api/owned-fish") else { return false }
+        guard let url = URL(string: "http://localhost:8000/api/fish-images") else { return false }
         
         do {
             let (_, response) = try await URLSession.shared.data(from: url)
             if let httpResponse = response as? HTTPURLResponse {
-                return httpResponse.statusCode == 200 || httpResponse.statusCode == 404
+                return httpResponse.statusCode == 200
             }
             return false
         } catch {
@@ -218,16 +218,16 @@ class CacheService: ObservableObject {
     // Load cached operations from UserDefaults
     private func loadCachedOperations() {
         let key = userKey(for: pendingOperationsKey)
-    if let data = UserDefaults.standard.data(forKey: key),
-       let operations = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-        pendingOperations = operations
-        print("Loaded \(operations.count) cached operations for user")
-        if operations.count > 0 {
-            wasBackendOffline = true
+        if let data = UserDefaults.standard.data(forKey: key),
+           let operations = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+            pendingOperations = operations
+            print("Loaded \(operations.count) cached operations for user")
+            if operations.count > 0 {
+                wasBackendOffline = true
+            }
+        } else {
+            pendingOperations = []
         }
-    } else {
-        pendingOperations = []
-    }
     }
     
     // Save cached operations to UserDefaults

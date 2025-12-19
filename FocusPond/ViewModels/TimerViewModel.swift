@@ -33,28 +33,60 @@ class TimerViewModel: ObservableObject {
     }
 
     func fetchTimerState() {
+        // Stop any lingering timer from previous sessions
+        TimerService.shared.stopTimer()
+        
         APIService.shared.getTimerState { [weak self] timerState in
-            guard let self = self, let timerState = timerState else { return }
-            DispatchQueue.main.async {
-                print("Debug: Fetched timer state - is_running: \(timerState.is_running), was_abandoned: \(timerState.was_abandoned)")  // Add for debugging
-                if timerState.is_running != 0 {  // Treat non-zero as true
-                    self.showAbandonedTimerDialog = true
-                    self.timerState = .idle
-                    if let fish = FishManager.shared.selectedFish {
-                        FishManager.shared.resetFishProgress(fishId: fish.id)
+            guard let self = self else { return }
+            let timerWasRunning = UserDefaults.standard.bool(forKey: "timerWasRunning")
+            
+            if let timerState = timerState {
+                DispatchQueue.main.async {
+                    print("Debug: Fetched timer state - is_running: \(timerState.is_running), was_abandoned: \(timerState.was_abandoned)")
+                    if timerState.is_running != 0 {
+                        self.showAbandonedTimerDialog = true
+                        self.timerState = .idle
+                        self.remainingTimeText = self.formatMillis(millis: Int64(self.selectedDuration) * 60 * 1000)
+                        UserDefaults.standard.set(false, forKey: "timerWasRunning")
+                        if let fish = FishManager.shared.selectedFish {
+                            FishManager.shared.resetFishProgress(fishId: fish.id)
+                        }
+                        let resetModel = TimerStateModel(id: 1, is_running: 0, was_abandoned: 1)  // Mark as abandoned
+                        APIService.shared.updateTimerState(resetModel) { _ in }
+                    } else if timerState.was_abandoned != 0 {
+                        self.showAbandonedTimerDialog = true
+                        self.timerState = .idle
+                        self.remainingTimeText = self.formatMillis(millis: Int64(self.selectedDuration) * 60 * 1000)
+                        UserDefaults.standard.set(false, forKey: "timerWasRunning")
+                        if let fish = FishManager.shared.selectedFish {
+                            FishManager.shared.resetFishProgress(fishId: fish.id)
+                        }
+                        let resetModel = TimerStateModel(id: 1, is_running: 0, was_abandoned: 0)
+                        APIService.shared.updateTimerState(resetModel) { _ in }
+                    } else if timerWasRunning {
+                        self.showAbandonedTimerDialog = true
+                        self.timerState = .idle
+                        self.remainingTimeText = self.formatMillis(millis: Int64(self.selectedDuration) * 60 * 1000)
+                        UserDefaults.standard.set(false, forKey: "timerWasRunning")
+                        if let fish = FishManager.shared.selectedFish {
+                            FishManager.shared.resetFishProgress(fishId: fish.id)
+                        }
+                    } else {
+                        self.timerState = .idle
                     }
-                    let resetModel = TimerStateModel(id: 1, is_running: 0, was_abandoned: 0)  // Use 0 for false
-                    APIService.shared.updateTimerState(resetModel) { _ in }
-                } else if timerState.was_abandoned != 0 {  // Treat non-zero as true
-                    self.showAbandonedTimerDialog = true
-                    self.timerState = .idle
-                    if let fish = FishManager.shared.selectedFish {
-                        FishManager.shared.resetFishProgress(fishId: fish.id)
+                }
+            } else {
+                // API failed, check local flag
+                if timerWasRunning {
+                    DispatchQueue.main.async {
+                        self.showAbandonedTimerDialog = true
+                        self.timerState = .idle
+                        self.remainingTimeText = self.formatMillis(millis: Int64(self.selectedDuration) * 60 * 1000)
+                        UserDefaults.standard.set(false, forKey: "timerWasRunning")
+                        if let fish = FishManager.shared.selectedFish {
+                            FishManager.shared.resetFishProgress(fishId: fish.id)
+                        }
                     }
-                    let resetModel = TimerStateModel(id: 1, is_running: 0, was_abandoned: 0)
-                    APIService.shared.updateTimerState(resetModel) { _ in }
-                } else {
-                    self.timerState = .idle
                 }
             }
         }
@@ -98,6 +130,7 @@ class TimerViewModel: ObservableObject {
         if timerState == .idle {
             timerService.startTimer(duration: Int64(selectedDuration) * 60 * 1000)
             timerState = .running
+            UserDefaults.standard.set(true, forKey: "timerWasRunning")  // Mark as running
             let timerStateModel = TimerStateModel(id: 1, is_running: 1, was_abandoned: 0)  // Use 1 for true
             APIService.shared.updateTimerState(timerStateModel) { _ in }
         }
@@ -126,6 +159,7 @@ class TimerViewModel: ObservableObject {
         timerState = .idle
         remainingTimeText = formatMillis(millis: Int64(selectedDuration) * 60 * 1000)
         sessionCompleted = false
+        UserDefaults.standard.set(false, forKey: "timerWasRunning")  // Mark as not running
         let timerStateModel = TimerStateModel(id: 1, is_running: 0, was_abandoned: 0)
         APIService.shared.updateTimerState(timerStateModel) { _ in }
     }

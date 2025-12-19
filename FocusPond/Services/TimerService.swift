@@ -64,6 +64,7 @@ final class TimerService : ObservableObject {
         remainingTime = 0
         activeDuration = 0
         sessionCompleted = false
+        state = .idle  // Ensure state is set to idle
     }
     
     func resetSessionCompletion(){
