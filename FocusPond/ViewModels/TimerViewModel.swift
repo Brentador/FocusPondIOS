@@ -20,6 +20,14 @@ class TimerViewModel: ObservableObject {
     private var subscriptions = Set<AnyCancellable>()
     private var hasFetchedState = false
     
+    // ✅ FIX: Make timer keys user-specific
+    private func userKey(for key: String) -> String {
+        if let userId = AuthService.shared.currentUser?.id {
+            return "\(key)_user\(userId)"
+        }
+        return key
+    }
+    
     func shouldFetchState() -> Bool {
         return !hasFetchedState
     }
@@ -38,7 +46,7 @@ class TimerViewModel: ObservableObject {
         
         APIService.shared.getTimerState { [weak self] timerState in
             guard let self = self else { return }
-            let timerWasRunning = UserDefaults.standard.bool(forKey: "timerWasRunning")
+            let timerWasRunning = UserDefaults.standard.bool(forKey: self.userKey(for: "timerWasRunning"))
             
             if let timerState = timerState {
                 DispatchQueue.main.async {
@@ -47,17 +55,17 @@ class TimerViewModel: ObservableObject {
                         self.showAbandonedTimerDialog = true
                         self.timerState = .idle
                         self.remainingTimeText = self.formatMillis(millis: Int64(self.selectedDuration) * 60 * 1000)
-                        UserDefaults.standard.set(false, forKey: "timerWasRunning")
+                        UserDefaults.standard.set(false, forKey: self.userKey(for: "timerWasRunning"))  // ✅ Fixed: was missing userKey
                         if let fish = FishManager.shared.selectedFish {
                             FishManager.shared.resetFishProgress(fishId: fish.id)
                         }
-                        let resetModel = TimerStateModel(id: 1, is_running: 0, was_abandoned: 1)  // Mark as abandoned
+                        let resetModel = TimerStateModel(id: 1, is_running: 0, was_abandoned: 0)  // ✅ Fixed: set both to 0 to clear
                         APIService.shared.updateTimerState(resetModel) { _ in }
                     } else if timerState.was_abandoned != 0 {
                         self.showAbandonedTimerDialog = true
                         self.timerState = .idle
                         self.remainingTimeText = self.formatMillis(millis: Int64(self.selectedDuration) * 60 * 1000)
-                        UserDefaults.standard.set(false, forKey: "timerWasRunning")
+                        UserDefaults.standard.set(false, forKey: self.userKey(for: "timerWasRunning"))
                         if let fish = FishManager.shared.selectedFish {
                             FishManager.shared.resetFishProgress(fishId: fish.id)
                         }
@@ -67,7 +75,7 @@ class TimerViewModel: ObservableObject {
                         self.showAbandonedTimerDialog = true
                         self.timerState = .idle
                         self.remainingTimeText = self.formatMillis(millis: Int64(self.selectedDuration) * 60 * 1000)
-                        UserDefaults.standard.set(false, forKey: "timerWasRunning")
+                        UserDefaults.standard.set(false, forKey: self.userKey(for: "timerWasRunning"))
                         if let fish = FishManager.shared.selectedFish {
                             FishManager.shared.resetFishProgress(fishId: fish.id)
                         }
@@ -82,7 +90,7 @@ class TimerViewModel: ObservableObject {
                         self.showAbandonedTimerDialog = true
                         self.timerState = .idle
                         self.remainingTimeText = self.formatMillis(millis: Int64(self.selectedDuration) * 60 * 1000)
-                        UserDefaults.standard.set(false, forKey: "timerWasRunning")
+                        UserDefaults.standard.set(false, forKey: self.userKey(for: "timerWasRunning"))
                         if let fish = FishManager.shared.selectedFish {
                             FishManager.shared.resetFishProgress(fishId: fish.id)
                         }
@@ -130,7 +138,7 @@ class TimerViewModel: ObservableObject {
         if timerState == .idle {
             timerService.startTimer(duration: Int64(selectedDuration) * 60 * 1000)
             timerState = .running
-            UserDefaults.standard.set(true, forKey: "timerWasRunning")  // Mark as running
+            UserDefaults.standard.set(true, forKey: userKey(for: "timerWasRunning"))  // Mark as running
             let timerStateModel = TimerStateModel(id: 1, is_running: 1, was_abandoned: 0)  // Use 1 for true
             APIService.shared.updateTimerState(timerStateModel) { _ in }
         }
@@ -159,7 +167,7 @@ class TimerViewModel: ObservableObject {
         timerState = .idle
         remainingTimeText = formatMillis(millis: Int64(selectedDuration) * 60 * 1000)
         sessionCompleted = false
-        UserDefaults.standard.set(false, forKey: "timerWasRunning")  // Mark as not running
+        UserDefaults.standard.set(false, forKey: userKey(for: "timerWasRunning"))  // Mark as not running
         let timerStateModel = TimerStateModel(id: 1, is_running: 0, was_abandoned: 0)
         APIService.shared.updateTimerState(timerStateModel) { _ in }
     }
@@ -208,5 +216,11 @@ class TimerViewModel: ObservableObject {
         let minutes = totalSeconds / 60
         let seconds = totalSeconds % 60
         return String(format: "%02d:%02d", minutes, seconds)
+    }
+    
+    //Clear timer data for current user
+    func clearUserTimerData() {
+        UserDefaults.standard.removeObject(forKey: userKey(for: "timerWasRunning"))
+        hasFetchedState = false
     }
 }

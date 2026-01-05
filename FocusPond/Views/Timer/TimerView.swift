@@ -56,32 +56,34 @@ struct TimerView: View {
                         .disabled(timerViewModel.timerState != .idle)
                         .padding(.horizontal, 32)
                         
-                        HStack {
-                            Button(action: {
-                                switch timerViewModel.timerState {
-                                case .idle: timerViewModel.startTimer()
-                                case .running: timerViewModel.pauseTimer()
-                                case .paused: timerViewModel.resumeTimer()
-                                }
-                            }) {
-                                Text(timerViewModel.timerState.buttonTitle())
-                                    .frame(maxWidth: .infinity, minHeight: 50)
-                                    .background(timerViewModel.timerState.buttonColor())
-                                    .foregroundColor(.white)
-                                    .cornerRadius(8)
-                            }
-                            
-                            if timerViewModel.timerState == .paused {
-                                Button(action: { timerViewModel.stopTimer() }) {
-                                    Text("Stop")
+                        if selectedFish != nil {
+                            HStack {
+                                Button(action: {
+                                    switch timerViewModel.timerState {
+                                    case .idle: timerViewModel.startTimer()
+                                    case .running: timerViewModel.pauseTimer()
+                                    case .paused: timerViewModel.resumeTimer()
+                                    }
+                                }) {
+                                    Text(timerViewModel.timerState.buttonTitle())
                                         .frame(maxWidth: .infinity, minHeight: 50)
-                                        .background(Color.red)
+                                        .background(timerViewModel.timerState.buttonColor())
                                         .foregroundColor(.white)
                                         .cornerRadius(8)
                                 }
+                                
+                                if timerViewModel.timerState == .paused {
+                                    Button(action: { timerViewModel.stopTimer() }) {
+                                        Text("Stop")
+                                            .frame(maxWidth: .infinity, minHeight: 50)
+                                            .background(Color.red)
+                                            .foregroundColor(.white)
+                                            .cornerRadius(8)
+                                    }
+                                }
                             }
+                            .padding(.horizontal, 16)
                         }
-                        .padding(.horizontal, 16)
             
             if timerViewModel.timerState == .idle {
                 Button("Inventory (\(fishManager.ownedFish.count))") {

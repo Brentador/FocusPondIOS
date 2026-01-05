@@ -61,7 +61,7 @@ final class TimerService : ObservableObject {
     func stopTimer() {
         timer?.invalidate()
         timer = nil
-        remainingTime = 0
+        remainingTime = defaultDuration  // Reset to default duration instead of 0
         activeDuration = 0
         sessionCompleted = false
         state = .idle  // Ensure state is set to idle

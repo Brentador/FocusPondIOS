@@ -26,14 +26,16 @@ struct Fish: Identifiable, Codable {
     }
     
     var growthStage: Int {
-        let progress = growthPercentage
-        switch progress {
-        case 67...:
-            return 2
-        case 34..<67:
-            return 1
+        let oneThird = totalTimeNeeded / 3
+        let twoThirds = (totalTimeNeeded * 2) / 3
+        
+        switch timeStudied {
+        case twoThirds...:
+            return 2  
+        case oneThird..<twoThirds:
+            return 1  
         default:
-            return 0
+            return 0  
         }
     }
     

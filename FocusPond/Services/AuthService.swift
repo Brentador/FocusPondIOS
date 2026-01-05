@@ -40,12 +40,33 @@ class AuthService: ObservableObject {
             print("   Switching from user \(oldUser.id) (\(oldUser.username)) to user \(userId) (\(username))")
         }
         
+        // ✅ FIX: Clear cache and reset state BEFORE setting new user
+        print("   Clearing old cache data...")
+        LocalDataCache.shared.clearUserCache()
+        
+        // ✅ FIX: Reset FishManager immediately (check if already on main thread)
+        if Thread.isMainThread {
+            FishManager.shared.resetState()
+        } else {
+            DispatchQueue.main.sync {
+                FishManager.shared.resetState()
+            }
+        }
+        
         currentUser = User(id: userId, username: username)
         userDefaults.set(userId, forKey: userIdKey)
         userDefaults.set(username, forKey: usernameKey)
         
         print("   User data saved to UserDefaults")
         print("   Current user is now: \(currentUser?.id ?? -1)")
+        
+        // ✅ FIX: Fetch fresh data for new user
+        print("   Fetching fresh data for new user...")
+        Task { @MainActor in
+            CacheService.shared.manualFetchAndReload {
+                print("   Fresh data loaded for user \(userId)")
+            }
+        }
     }
     
     func logout() {
@@ -53,6 +74,11 @@ class AuthService: ObservableObject {
         
         if let user = currentUser {
             print("   Logging out user: ID=\(user.id), Username=\(user.username)")
+            
+            // Clear timer UserDefaults for this user
+            let timerKey = "timerWasRunning_user\(user.id)"
+            userDefaults.removeObject(forKey: timerKey)
+            print("   Cleared timer state for user \(user.id)")
         } else {
             print("   No user to log out")
         }

@@ -107,7 +107,7 @@ class LocalDataCache {
         print("[LocalDataCache] REMOVING FISH \(fishId) from cache for user \(currentUserId ?? -1)")
         
         guard var cached = getCachedOwnedFish() else {
-            print("   ❌ No cached fish found")
+            print("No cached fish found")
             return
         }
         
@@ -121,7 +121,7 @@ class LocalDataCache {
     func cachePondFish(_ fish: [PondFish]) {
         let currentUserId = AuthService.shared.currentUser?.id
         print("[LocalDataCache] CACHING POND FISH for user \(currentUserId ?? -1): \(fish.count) fish")
-        print("   Fish IDs: \(fish.map { $0.fish_id })")
+        print("Fish IDs: \(fish.map { $0.fish_id })")
         
         if let data = try? JSONEncoder().encode(fish) {
             let key = userKey(for: pondFishKey)

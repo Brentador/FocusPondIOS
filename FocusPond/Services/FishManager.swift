@@ -74,7 +74,7 @@ class FishManager: ObservableObject {
     
 
     func addFishToInventory(fishId: Int) {
-        APIService.shared.addOwnedFish(fishId: fishId) {  success in
+        CacheService.shared.addOwnedFish(fishId: fishId) { success in
             if success {
                 CacheService.shared.manualFetchAndReload {}
             }
@@ -83,7 +83,7 @@ class FishManager: ObservableObject {
     
 
     func addStudyTime(fishId: Int, minutes: Int) {
-        APIService.shared.addStudyTime(fishId: fishId, minutes: minutes) { success in
+        CacheService.shared.addStudyTime(fishId: fishId, minutes: minutes) { success in
             if success {
                 CacheService.shared.manualFetchAndReload {}
             }
@@ -101,7 +101,7 @@ class FishManager: ObservableObject {
     
 
     func addFishToPond(fish: Fish) {
-        APIService.shared.addFishToPond(fishId: fish.id) { success in
+        CacheService.shared.addFishToPond(fishId: fish.id) { success in
             if success {
                 CacheService.shared.manualFetchAndReload {}
             }
@@ -111,7 +111,7 @@ class FishManager: ObservableObject {
 
     func addCurrency(amount: Int) {
         let newAmount = currency + amount
-        APIService.shared.updateCurrency(amount: newAmount) { success in
+        CacheService.shared.updateCurrency(amount: newAmount) { success in
             if success {
                 CacheService.shared.manualFetchAndReload {}
             }
@@ -126,10 +126,20 @@ class FishManager: ObservableObject {
     
 
     func resetFishProgress(fishId: Int) {
-        APIService.shared.resetFishProgress(fishId: fishId) { success in
+        CacheService.shared.resetFishProgress(fishId: fishId) { success in
             if success {
                 CacheService.shared.manualFetchAndReload {}
             }
         }
+    }
+    
+    // ✅ NEW: Reset all in-memory state (called on logout/user switch)
+    @MainActor
+    func resetState() {
+        print("[FishManager] Resetting all in-memory state")
+        ownedFish = []
+        pondFish = []
+        selectedFish = nil
+        currency = 0
     }
 }

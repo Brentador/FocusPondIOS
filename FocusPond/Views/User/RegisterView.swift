@@ -16,16 +16,34 @@ struct RegisterView: View {
             TextField("Email", text: $email)
                 .autocapitalization(.none)
             Button("Register") {
+                // Input validation
+                guard !username.isEmpty else {
+                    errorMessage = "Username cannot be empty"
+                    return
+                }
+                guard !password.isEmpty else {
+                    errorMessage = "Password cannot be empty"
+                    return
+                }
+                guard !email.isEmpty else {
+                    errorMessage = "Email cannot be empty"
+                    return
+                }
+                guard email.contains("@") && email.contains(".") else {
+                    errorMessage = "Invalid email format"
+                    return
+                }
+                
                 print("[RegisterView] Register button tapped with username: \(username), email: \(email)")
-                APIService.shared.register(username: username, password: password, email: email) { success in
+                APIService.shared.register(username: username, password: password, email: email) { success, error in
                     print("[RegisterView] Register API response: success=\(success)")
                     if success {
                         print("[RegisterView] Registration successful")
                         isRegistered = true
                         errorMessage = ""
                     } else {
-                        print("[RegisterView] Registration failed")
-                        errorMessage = "Registration failed"
+                        print("[RegisterView] Registration failed: \(error ?? "Unknown error")")
+                        errorMessage = error ?? "Registration failed"
                     }
                 }
             }

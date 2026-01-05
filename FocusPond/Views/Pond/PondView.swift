@@ -28,10 +28,10 @@ struct PondView: View {
                             weatherService.fetchWeather(lat: 30.0444, lon: 31.2357) // Cairo
                         }
                         Button("Rainy") {
-                            weatherService.fetchWeather(lat: 51.5074, lon: -0.1278) // London
+                            weatherService.fetchWeather(lat: 55.75, lon: 37.62) // London
                         }
                         Button("Snowy") {
-                            weatherService.fetchWeather(lat: 56.2526, lon: -120.8460) // Helsinki
+                            weatherService.fetchWeather(lat: 45.815399, lon: 15.966568) // Helsinki
                         }
                     }
                     .padding()
@@ -39,7 +39,7 @@ struct PondView: View {
                     .cornerRadius(8)
                     .padding(.bottom, 20),
                     alignment: .bottom
-                )*/
+                    )*/
             }
             .onAppear {
                 weatherService.start()

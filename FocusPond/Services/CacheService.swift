@@ -151,6 +151,111 @@ class CacheService: ObservableObject {
         }
     }
     
+    // MARK: - Public Orchestration Methods
+    
+    func getCurrency(completion: @escaping (Currency?) -> Void) {
+        APIService.shared.getCurrency { currency in
+            if let currency = currency {
+                LocalDataCache.shared.cacheCurrency(currency)
+                completion(currency)
+            } else {
+                // Offline - use cache
+                completion(LocalDataCache.shared.getCachedCurrency())
+            }
+        }
+    }
+    
+    func updateCurrency(amount: Int, completion: @escaping (Bool) -> Void) {
+        APIService.shared.updateCurrency(amount: amount) { success in
+            LocalDataCache.shared.updateCurrencyInCache(newAmount: amount)
+            if !success {
+                // Offline - queue for sync
+                self.cacheOperation(["type": "updateCurrency", "amount": amount])
+            }
+            completion(true)
+        }
+    }
+    
+    func getOwnedFish(completion: @escaping ([OwnedFish]?) -> Void) {
+        APIService.shared.getOwnedFish { fish in
+            if let fish = fish {
+                LocalDataCache.shared.cacheOwnedFish(fish)
+                completion(fish)
+            } else {
+                // Offline - use cache
+                completion(LocalDataCache.shared.getCachedOwnedFish())
+            }
+        }
+    }
+    
+    func addOwnedFish(fishId: Int, completion: @escaping (Bool) -> Void) {
+        APIService.shared.addOwnedFish(fishId: fishId) { success in
+            LocalDataCache.shared.addOwnedFishToCache(fishId: fishId)
+            if !success {
+                // Offline - queue for sync
+                self.cacheOperation(["type": "addOwnedFish", "fishId": fishId])
+            }
+            completion(true)
+        }
+    }
+    
+    func addStudyTime(fishId: Int, minutes: Int, completion: @escaping (Bool) -> Void) {
+        APIService.shared.addStudyTime(fishId: fishId, minutes: minutes) { success in
+            LocalDataCache.shared.updateStudyTimeInCache(fishId: fishId, additionalMinutes: minutes)
+            if !success {
+                // Offline - queue for sync
+                self.cacheOperation(["type": "addStudyTime", "fishId": fishId, "minutes": minutes])
+            }
+            completion(true)
+        }
+    }
+    
+    func resetFishProgress(fishId: Int, completion: @escaping (Bool) -> Void) {
+        APIService.shared.resetFishProgress(fishId: fishId) { success in
+            LocalDataCache.shared.removeFishFromCache(fishId: fishId)
+            if !success {
+                // Offline - queue for sync
+                self.cacheOperation(["type": "resetFishProgress", "fishId": fishId])
+            }
+            completion(true)
+        }
+    }
+    
+    func getPondFish(completion: @escaping ([PondFish]?) -> Void) {
+        APIService.shared.getPondFish { fish in
+            if let fish = fish {
+                LocalDataCache.shared.cachePondFish(fish)
+                completion(fish)
+            } else {
+                // Offline - use cache
+                completion(LocalDataCache.shared.getCachedPondFish())
+            }
+        }
+    }
+    
+    func addFishToPond(fishId: Int, completion: @escaping (Bool) -> Void) {
+        APIService.shared.addFishToPond(fishId: fishId) { success in
+            LocalDataCache.shared.addFishToPondCache(fishId: fishId)
+            if !success {
+                // Offline - queue for sync
+                self.cacheOperation(["type": "addFishToPond", "fishId": fishId])
+            }
+            completion(true)
+        }
+    }
+    
+    func getFishImages(completion: @escaping ([FishImage]?) -> Void) {
+        APIService.shared.getFishImages { images in
+            if let images = images {
+                LocalDataCache.shared.cacheFishImages(images)
+                completion(images)
+            } else {
+                // Offline - use cache
+                completion(LocalDataCache.shared.getCachedFishImages())
+            }
+        }
+    }
+    
     // Process a cached operation
     private func processCachedOperation(_ operation: [String: Any]) async -> Bool {
         guard let type = operation["type"] as? String else { return false }
@@ -162,7 +267,7 @@ class CacheService: ObservableObject {
                     continuation.resume(returning: false)
                     return
                 }
-                APIService.shared.performAddOwnedFish(fishId: fishId) { success in
+                APIService.shared.addOwnedFish(fishId: fishId) { success in
                     print(success ? "Synced addOwnedFish for fishId: \(fishId)" : "Failed to sync addOwnedFish")
                     continuation.resume(returning: success)
                 }
@@ -172,7 +277,7 @@ class CacheService: ObservableObject {
                     continuation.resume(returning: false)
                     return
                 }
-                APIService.shared.performUpdateCurrency(amount: amount) { success in
+                APIService.shared.updateCurrency(amount: amount) { success in
                     print(success ? "Synced updateCurrency for amount: \(amount)" : "Failed to sync updateCurrency")
                     continuation.resume(returning: success)
                 }
@@ -183,7 +288,7 @@ class CacheService: ObservableObject {
                     continuation.resume(returning: false)
                     return
                 }
-                APIService.shared.performAddStudyTime(fishId: fishId, minutes: minutes) { success in
+                APIService.shared.addStudyTime(fishId: fishId, minutes: minutes) { success in
                     print(success ? "Synced addStudyTime for fishId: \(fishId)" : "Failed to sync addStudyTime")
                     continuation.resume(returning: success)
                 }
@@ -193,7 +298,7 @@ class CacheService: ObservableObject {
                     continuation.resume(returning: false)
                     return
                 }
-                APIService.shared.performAddFishToPond(fishId: fishId) { success in
+                APIService.shared.addFishToPond(fishId: fishId) { success in
                     print(success ? "Synced addFishToPond for fishId: \(fishId)" : "Failed to sync addFishToPond")
                     continuation.resume(returning: success)
                 }
@@ -203,7 +308,7 @@ class CacheService: ObservableObject {
                     continuation.resume(returning: false)
                     return
                 }
-                APIService.shared.performResetFishProgress(fishId: fishId) { success in
+                APIService.shared.resetFishProgress(fishId: fishId) { success in
                     print(success ? "Synced resetFishProgress for fishId: \(fishId)" : "Failed to sync resetFishProgress")
                     continuation.resume(returning: success)
                 }
@@ -252,45 +357,31 @@ class CacheService: ObservableObject {
     
     @MainActor
     func manualFetchAndReload(completion: @escaping () -> Void) {
-        let apiService = APIService()
-        
         let group = DispatchGroup()
         
         group.enter()
-        apiService.getOwnedFish { fish in
-            if let fish = fish {
-                LocalDataCache.shared.cacheOwnedFish(fish)
-            }
+        self.getOwnedFish { _ in
             group.leave()
         }
         
         group.enter()
-        apiService.getPondFish { fish in
-            if let fish = fish {
-                LocalDataCache.shared.cachePondFish(fish)
-            }
+        self.getPondFish { _ in
             group.leave()
         }
         
         group.enter()
-        apiService.getCurrency { currency in
-            if let currency = currency {
-                LocalDataCache.shared.cacheCurrency(currency)
-            }
+        self.getCurrency { _ in
             group.leave()
         }
         
         group.enter()
-        apiService.getFishImages { images in
-            if let images = images {
-                LocalDataCache.shared.cacheFishImages(images)
-            }
+        self.getFishImages { _ in
             group.leave()
         }
         
         group.notify(queue: .main) {
             print("Manual cache update complete")
-            FishManager.shared.loadData()  // Reload UI from cache
+            FishManager.shared.loadData()
             completion()
         }
     }
